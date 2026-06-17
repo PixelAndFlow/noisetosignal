@@ -1,0 +1,45 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #0f0f12;
+  --surface: #18181f;
+  --surface-hover: #22222c;
+  --border: #2a2a35;
+  --text: #f4f4f5;
+  --text-muted: #a1a1aa;
+  --accent: #ff4444;
+  --accent-hover: #ff6666;
+  --success: #22c55e;
+  --radius: 10px;
+  --font: 'DM Sans', system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+}
