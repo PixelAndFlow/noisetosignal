@@ -1,0 +1,23 @@
+.app-body {
+  display: flex;
+  padding-top: var(--nav-height);
+  min-height: 100vh;
+}
+
+.app-content {
+  flex: 1;
+  min-width: 0;
+  margin-left: var(--sidebar-collapsed);
+  transition: margin-left var(--transition);
+}
+
+.app-content.sidebar-expanded {
+  margin-left: var(--sidebar-width);
+}
+
+@media (max-width: 768px) {
+  .app-content,
+  .app-content.sidebar-expanded {
+    margin-left: 0;
+  }
+}

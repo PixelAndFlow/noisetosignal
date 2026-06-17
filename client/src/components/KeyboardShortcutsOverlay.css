@@ -1,0 +1,45 @@
+.shortcuts-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+}
+.shortcuts-dialog {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 24px;
+  min-width: 320px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.shortcuts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.shortcuts-header h2 { font-size: 16px; font-weight: 600; }
+.shortcuts-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.shortcuts-close:hover { color: var(--text); }
+.shortcuts-list { display: flex; flex-direction: column; gap: 12px; }
+.shortcut-row { display: flex; align-items: center; gap: 16px; }
+.shortcut-keys { display: flex; gap: 4px; min-width: 80px; }
+kbd {
+  display: inline-block;
+  padding: 3px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: monospace;
+  font-weight: 600;
+}
+.shortcut-action { font-size: 14px; color: var(--text-secondary); }
