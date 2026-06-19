@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import './CreatorPanel.css';
 
-export default function CreatorPanel({ subscriptions, onToggle, onBulkToggle, onSync, lastSyncedAt, syncing }) {
+export default function CreatorPanel({ subscriptions, onToggle, onBulkToggle, onSync, lastSyncedAt, syncing, bulkProgress }) {
   const [search, setSearch] = useState('');
   const [confirmDeselect, setConfirmDeselect] = useState(null);
 
@@ -78,9 +78,10 @@ export default function CreatorPanel({ subscriptions, onToggle, onBulkToggle, on
 
       {filtered.length > 0 && (
         <div className="creator-bulk">
-          <button className="bulk-btn" onClick={toggleAll}>
-            {allFilteredSelected ? 'Deselect all' : 'Select all'}
-            {search ? ' in results' : ''}
+          <button className="bulk-btn" onClick={toggleAll} disabled={!!bulkProgress}>
+            {bulkProgress
+              ? <span className="spinner small" />
+              : (allFilteredSelected ? 'Deselect all' : 'Select all') + (search ? ' in results' : '')}
           </button>
         </div>
       )}
