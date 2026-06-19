@@ -25,6 +25,7 @@ export default function HomePage() {
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [syncBanner, setSyncBanner] = useState(null);
+  const [bulkProgress, setBulkProgress] = useState(null);
   const [iframeBlocked, setIframeBlocked] = useState(false);
   const [showDataSource, setShowDataSource] = useState(user?.settings?.data_source_indicator === 'on');
 
@@ -121,12 +122,15 @@ export default function HomePage() {
   }
 
   async function handleBulkToggle(channelIds, selected) {
+    setBulkProgress({ count: channelIds.length, selected });
     await fetch('/api/subscriptions/selections/bulk', {
       method: 'PUT', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channel_ids: channelIds, selected }),
     });
-    setSubscriptions(prev => prev.map(s => channelIds.includes(s.channel_id) ? { ...s, selected } : s));
+    const channelSet = new Set(channelIds);
+    setSubscriptions(prev => prev.map(s => channelSet.has(s.channel_id) ? { ...s, selected } : s));
+    setBulkProgress(null);
   }
 
   function handleTimeframeChange(tf) {
@@ -191,9 +195,19 @@ export default function HomePage() {
         onSync={handleSync}
         lastSyncedAt={lastSyncedAt}
         syncing={syncing}
+        bulkProgress={bulkProgress}
       />
 
       <div className="home-main">
+        {bulkProgress && (
+          <div className="banner banner-info sync-banner">
+            <span className="spinner small" style={{ marginRight: 8 }} />
+            {bulkProgress.selected
+              ? `Selecting ${bulkProgress.count.toLocaleString()} creators...`
+              : `Deselecting ${bulkProgress.count.toLocaleString()} creators...`}
+          </div>
+        )}
+
         {syncBanner && (
           <div className={`banner banner-${syncBanner.type === 'error' ? 'error' : 'info'} sync-banner`}>
             {syncBanner.msg}

@@ -135,12 +135,12 @@ router.put('/selections/bulk', requireAuth, async (req, res) => {
   if (!Array.isArray(channel_ids)) return res.status(400).json({ error: 'channel_ids array required' });
 
   if (selected) {
-    for (const id of channel_ids) {
-      await db.query(
-        'INSERT INTO creator_selections (user_id, channel_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-        [req.user.id, id]
-      );
-    }
+    await db.query(
+      `INSERT INTO creator_selections (user_id, channel_id)
+       SELECT $1, unnest($2::text[])
+       ON CONFLICT DO NOTHING`,
+      [req.user.id, channel_ids]
+    );
   } else {
     await db.query(
       'DELETE FROM creator_selections WHERE user_id = $1 AND channel_id = ANY($2)',

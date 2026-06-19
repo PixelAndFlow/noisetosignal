@@ -107,71 +107,73 @@ async function getVideosForChannels(channelIds, isActive = false) {
   const ttlMinutes = isActive ? ACTIVE_TTL_MINUTES : INACTIVE_TTL_MINUTES;
   const now = new Date();
 
-  const fresh = [];
-  const stale = [];
+  // Single query: top-50 unexpired videos for every channel in one round-trip
+  const cachedResult = await db.query(
+    `SELECT * FROM (
+       SELECT *, row_number() OVER (PARTITION BY channel_id ORDER BY published_at DESC) AS rn
+       FROM cached_videos
+       WHERE channel_id = ANY($1) AND expires_at > NOW()
+     ) ranked WHERE rn <= 50`,
+    [channelIds]
+  );
+  const freshChannelSet = new Set(cachedResult.rows.map(r => r.channel_id));
+  const fresh = cachedResult.rows.map(({ rn: _, ...row }) => row);
+  const stale = channelIds.filter(id => !freshChannelSet.has(id));
 
-  for (const channelId of channelIds) {
-    const cached = await db.query(
-      `SELECT * FROM cached_videos WHERE channel_id = $1 AND expires_at > NOW() ORDER BY published_at DESC LIMIT 50`,
-      [channelId]
-    );
-    if (cached.rows.length > 0) {
-      fresh.push(...cached.rows);
-    } else {
-      stale.push(channelId);
-    }
-  }
+  const CHANNEL_BATCH_SIZE = 20;
+  for (let i = 0; i < stale.length; i += CHANNEL_BATCH_SIZE) {
+    const batch = stale.slice(i, i + CHANNEL_BATCH_SIZE);
+    await Promise.all(batch.map(async (channelId) => {
+      let videos = await fetchRSSVideos(channelId);
+      let source = 'rss';
 
-  for (const channelId of stale) {
-    let videos = await fetchRSSVideos(channelId);
-    let source = 'rss';
-
-    if (!videos) {
-      try {
-        const playlistId = await getUploadsPlaylistId(channelId);
-        if (playlistId) {
-          videos = await fetchAPIVideos(channelId, playlistId);
-          source = 'api';
-        } else {
+      if (!videos) {
+        try {
+          const playlistId = await getUploadsPlaylistId(channelId);
+          if (playlistId) {
+            videos = await fetchAPIVideos(channelId, playlistId);
+            source = 'api';
+          } else {
+            videos = [];
+          }
+        } catch {
           videos = [];
         }
-      } catch {
-        videos = [];
-      }
-    }
-
-    if (videos.length > 0) {
-      const needsEnrichment = videos.filter(v => !v.duration || !v.view_count);
-      if (needsEnrichment.length > 0 && source === 'rss') {
-        try {
-          const enriched = await enrichWithDurationAndViews(needsEnrichment.map(v => v.video_id));
-          videos = videos.map(v => ({
-            ...v,
-            duration: enriched[v.video_id]?.duration || v.duration,
-            view_count: enriched[v.video_id]?.view_count || v.view_count,
-          }));
-        } catch { /* enrichment optional */ }
       }
 
-      const expiresAt = new Date(now.getTime() + ttlMinutes * 60 * 1000);
+      if (videos.length > 0) {
+        const needsEnrichment = videos.filter(v => !v.duration || !v.view_count);
+        if (needsEnrichment.length > 0 && source === 'rss') {
+          try {
+            const enriched = await enrichWithDurationAndViews(needsEnrichment.map(v => v.video_id));
+            videos = videos.map(v => ({
+              ...v,
+              duration: enriched[v.video_id]?.duration || v.duration,
+              view_count: enriched[v.video_id]?.view_count || v.view_count,
+            }));
+          } catch { /* enrichment optional */ }
+        }
 
-      for (const v of videos) {
-        await db.query(
-          `INSERT INTO cached_videos (channel_id, video_id, title, thumbnail_url, published_at, duration, view_count, data_source, cached_at, expires_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9)
-           ON CONFLICT (video_id) DO UPDATE SET
-             title = EXCLUDED.title, thumbnail_url = EXCLUDED.thumbnail_url,
-             view_count = EXCLUDED.view_count, cached_at = NOW(), expires_at = EXCLUDED.expires_at`,
-          [channelId, v.video_id, v.title, v.thumbnail_url, v.published_at, v.duration, v.view_count, v.data_source, expiresAt]
+        const expiresAt = new Date(now.getTime() + ttlMinutes * 60 * 1000);
+
+        for (const v of videos) {
+          await db.query(
+            `INSERT INTO cached_videos (channel_id, video_id, title, thumbnail_url, published_at, duration, view_count, data_source, cached_at, expires_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9)
+             ON CONFLICT (video_id) DO UPDATE SET
+               title = EXCLUDED.title, thumbnail_url = EXCLUDED.thumbnail_url,
+               view_count = EXCLUDED.view_count, cached_at = NOW(), expires_at = EXCLUDED.expires_at`,
+            [channelId, v.video_id, v.title, v.thumbnail_url, v.published_at, v.duration, v.view_count, v.data_source, expiresAt]
+          );
+        }
+
+        const rows = await db.query(
+          `SELECT * FROM cached_videos WHERE channel_id = $1 ORDER BY published_at DESC LIMIT 50`,
+          [channelId]
         );
+        fresh.push(...rows.rows);
       }
-
-      const rows = await db.query(
-        `SELECT * FROM cached_videos WHERE channel_id = $1 ORDER BY published_at DESC LIMIT 50`,
-        [channelId]
-      );
-      fresh.push(...rows.rows);
-    }
+    }));
   }
 
   return fresh.map(v => ({
@@ -180,14 +182,22 @@ async function getVideosForChannels(channelIds, isActive = false) {
   }));
 }
 
+const SUBSCRIPTION_PAGE_LIMIT = 100; // safety cap: 100 pages × 50 = 5,000 results
+
 async function fetchSubscriptions(accessToken) {
   const subs = [];
   let pageToken = null;
+  let pageCount = 0;
+
   do {
+    const params = { part: 'snippet', mine: true, maxResults: 50 };
+    if (pageToken) params.pageToken = pageToken;
+
     const res = await axios.get(`${YT_API}/subscriptions`, {
-      params: { part: 'snippet', mine: true, maxResults: 50, pageToken },
+      params,
       headers: { Authorization: `Bearer ${accessToken}` },
     });
+
     for (const item of res.data.items || []) {
       subs.push({
         channel_id: item.snippet.resourceId.channelId,
@@ -195,8 +205,17 @@ async function fetchSubscriptions(accessToken) {
         channel_avatar_url: item.snippet.thumbnails?.default?.url,
       });
     }
+
     pageToken = res.data.nextPageToken || null;
+    pageCount++;
+
+    if (pageCount >= SUBSCRIPTION_PAGE_LIMIT) {
+      console.error(`fetchSubscriptions: hit ${SUBSCRIPTION_PAGE_LIMIT}-page safety limit (${subs.length} subs fetched). There may be more subscriptions the API is not returning.`);
+      break;
+    }
   } while (pageToken);
+
+  console.log(`fetchSubscriptions: fetched ${subs.length} subscriptions across ${pageCount} page(s)`);
   return subs;
 }
 
