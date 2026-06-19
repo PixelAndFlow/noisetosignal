@@ -84,15 +84,22 @@ router.post('/sync', requireAuth, syncLimiter, async (req, res) => {
     const result = await syncSubscriptions(req.user.id);
     res.json(result);
   } catch (err) {
-    console.error('SYNC ERROR:', err);
-    // await db.query(
-    //   `INSERT INTO sync_log (user_id, sync_type, outcome, error_message) VALUES ($1, 'manual', 'failure', $2)`,
-    //   [req.user.id, err.message]
-    // );
-    // await db.query(
-    //   `INSERT INTO error_log (error_type, user_id, endpoint, resolution_action) VALUES ('sync_failure', $1, '/api/subscriptions/sync', 'logged')`,
-    //   [req.user.id]
-    // );
+    const safeMsg = err.response?.status
+      ? `${err.message} (HTTP ${err.response.status})`
+      : err.message;
+    console.error('SYNC ERROR:', safeMsg);
+    try {
+      await db.query(
+        `INSERT INTO sync_log (user_id, sync_type, outcome, error_message) VALUES ($1, 'manual', 'failure', $2)`,
+        [req.user.id, err.message]
+      );
+      await db.query(
+        `INSERT INTO error_log (error_type, user_id, endpoint, resolution_action) VALUES ('sync_failure', $1, '/api/subscriptions/sync', 'logged')`,
+        [req.user.id]
+      );
+    } catch (logErr) {
+      console.error('SYNC ERROR: failed to write to error log:', logErr.message);
+    }
     res.status(500).json({ error: 'Sync failed. Please try again.' });
   }
 });

@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import './CreatorPanel.css';
 
 export default function CreatorPanel({ subscriptions, onToggle, onBulkToggle, onSync, lastSyncedAt, syncing }) {
@@ -105,7 +106,7 @@ export default function CreatorPanel({ subscriptions, onToggle, onBulkToggle, on
         )}
       </div>
 
-      {confirmDeselect && (
+      {confirmDeselect && createPortal(
         <div className="confirm-overlay" onClick={() => setConfirmDeselect(null)}>
           <div className="confirm-dialog" onClick={e => e.stopPropagation()}>
             <p>Deselecting <strong>{confirmDeselect.channel_name}</strong> will remove all of their videos from results. They'll need to be re-added to appear again.</p>
@@ -114,7 +115,8 @@ export default function CreatorPanel({ subscriptions, onToggle, onBulkToggle, on
               <button className="btn btn-danger" onClick={confirmDeselection}>Deselect</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
