@@ -130,6 +130,11 @@ router.put('/selections', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+router.delete('/selections', requireAuth, async (req, res) => {
+  await db.query('DELETE FROM creator_selections WHERE user_id = $1', [req.user.id]);
+  res.json({ ok: true });
+});
+
 router.put('/selections/bulk', requireAuth, async (req, res) => {
   const { channel_ids, selected } = req.body;
   if (!Array.isArray(channel_ids)) return res.status(400).json({ error: 'channel_ids array required' });

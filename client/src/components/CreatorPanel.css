@@ -17,20 +17,38 @@
   justify-content: space-between;
   padding: 14px 16px 8px;
 }
-.creator-panel-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.creator-panel-label {
   font-size: 14px;
   font-weight: 600;
 }
-.creator-count {
+
+/* Persistent stats row (subscribed count / live progress) */
+.creator-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 6px;
   font-size: 12px;
-  font-weight: 400;
+}
+.creator-total {
   color: var(--text-secondary);
-  background: var(--bg-secondary);
+  font-weight: 500;
+}
+.creator-selected-badge {
+  background: var(--accent);
+  color: #fff;
   padding: 2px 7px;
   border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.creator-progress {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+}
+.creator-progress strong {
+  font-weight: 700;
 }
 
 .sync-btn {
@@ -75,6 +93,56 @@
   outline: none;
 }
 .creator-search:focus { border-color: var(--accent); }
+
+/* View toggle + jump arrows row */
+.creator-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px 6px;
+}
+.view-toggle {
+  display: flex;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+.view-toggle-btn {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.view-toggle-btn.active {
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+.view-toggle-btn:hover:not(.active) { color: var(--text); }
+
+.jump-arrows { display: flex; gap: 4px; }
+.jump-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.jump-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
+.jump-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
 .creator-bulk { padding: 0 12px 6px; }
 .bulk-btn {

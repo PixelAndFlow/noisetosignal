@@ -25,6 +25,7 @@ router.get('/feed', requireAuth, async (req, res) => {
     [req.user.id]
   );
   const channelIds = selections.rows.map(r => r.channel_id);
+  console.log(`[FEED] user ${req.user.id}: ${channelIds.length} channel(s) in creator_selections`);
 
   if (channelIds.length === 0) {
     return res.json({ videos: [], total: 0, channel_count: 0 });
@@ -57,8 +58,15 @@ router.get('/feed', requireAuth, async (req, res) => {
     [channelIds, cutoff, offsetNum]
   );
 
-  const total = videoRows.rows.length;
-  const videos = videoRows.rows.slice(0, 100).map(v => ({
+  const channelIdSet = new Set(channelIds);
+  const guardedRows = videoRows.rows.filter(v => {
+    if (channelIdSet.has(v.channel_id)) return true;
+    console.error(`[FEED FILTER] Dropping video ${v.video_id} from non-selected channel ${v.channel_id}`);
+    return false;
+  });
+
+  const total = guardedRows.length;
+  const videos = guardedRows.slice(0, 100).map(v => ({
     ...v,
     watched: watchedIds.has(v.video_id),
     channel_name: subMap[v.channel_id]?.channel_name,

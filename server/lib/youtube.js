@@ -168,7 +168,7 @@ async function getVideosForChannels(channelIds, isActive = false) {
         }
 
         const rows = await db.query(
-          `SELECT * FROM cached_videos WHERE channel_id = $1 ORDER BY published_at DESC LIMIT 50`,
+          `SELECT * FROM cached_videos WHERE channel_id = $1 AND expires_at > NOW() ORDER BY published_at DESC LIMIT 50`,
           [channelId]
         );
         fresh.push(...rows.rows);
@@ -176,10 +176,13 @@ async function getVideosForChannels(channelIds, isActive = false) {
     }));
   }
 
-  return fresh.map(v => ({
-    ...v,
-    view_count_display: formatViewCount(v.view_count),
-  }));
+  const requestedSet = new Set(channelIds);
+  return fresh
+    .filter(v => requestedSet.has(v.channel_id))
+    .map(v => ({
+      ...v,
+      view_count_display: formatViewCount(v.view_count),
+    }));
 }
 
 const SUBSCRIPTION_PAGE_LIMIT = 100; // safety cap: 100 pages × 50 = 5,000 results
@@ -190,7 +193,7 @@ async function fetchSubscriptions(accessToken) {
   let pageCount = 0;
 
   do {
-    const params = { part: 'snippet', mine: true, maxResults: 50 };
+    const params = { part: 'snippet', mine: true, maxResults: 50, order: 'alphabetical' };
     if (pageToken) params.pageToken = pageToken;
 
     const res = await axios.get(`${YT_API}/subscriptions`, {
@@ -208,6 +211,8 @@ async function fetchSubscriptions(accessToken) {
 
     pageToken = res.data.nextPageToken || null;
     pageCount++;
+
+    console.log(`[subs page ${pageCount}] ${(res.data.items || []).length} items | nextPageToken: ${res.data.nextPageToken || 'NONE'}`);
 
     if (pageCount >= SUBSCRIPTION_PAGE_LIMIT) {
       console.error(`fetchSubscriptions: hit ${SUBSCRIPTION_PAGE_LIMIT}-page safety limit (${subs.length} subs fetched). There may be more subscriptions the API is not returning.`);

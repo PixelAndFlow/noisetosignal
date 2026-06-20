@@ -108,11 +108,15 @@ export default function HomePage() {
   }
 
   async function handleToggle(channelId, selected) {
-    await fetch('/api/subscriptions/selections', {
+    const res = await fetch('/api/subscriptions/selections', {
       method: 'PUT', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channel_id: channelId, selected }),
     });
+    if (!res.ok) {
+      await loadSubscriptions();
+      return;
+    }
     setSubscriptions(prev => prev.map(s => s.channel_id === channelId ? { ...s, selected } : s));
     fetch('/api/events', {
       method: 'POST', credentials: 'include',
@@ -121,13 +125,26 @@ export default function HomePage() {
     }).catch(() => {});
   }
 
+  async function handleDeselctAll() {
+    setBulkProgress({ total: subscriptions.length, done: 0, selected: false });
+    await fetch('/api/subscriptions/selections', { method: 'DELETE', credentials: 'include' });
+    await loadSubscriptions();
+    setBulkProgress(null);
+  }
+
   async function handleBulkToggle(channelIds, selected) {
-    setBulkProgress({ count: channelIds.length, selected });
-    await fetch('/api/subscriptions/selections/bulk', {
-      method: 'PUT', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ channel_ids: channelIds, selected }),
-    });
+    const BATCH_SIZE = 100;
+    setBulkProgress({ total: channelIds.length, done: 0, selected });
+    for (let i = 0; i < channelIds.length; i += BATCH_SIZE) {
+      const batch = channelIds.slice(i, i + BATCH_SIZE);
+      await fetch('/api/subscriptions/selections/bulk', {
+        method: 'PUT', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel_ids: batch, selected }),
+      });
+      const done = Math.min(i + BATCH_SIZE, channelIds.length);
+      setBulkProgress({ total: channelIds.length, done, selected });
+    }
     const channelSet = new Set(channelIds);
     setSubscriptions(prev => prev.map(s => channelSet.has(s.channel_id) ? { ...s, selected } : s));
     setBulkProgress(null);
@@ -192,19 +209,19 @@ export default function HomePage() {
         subscriptions={subscriptions}
         onToggle={handleToggle}
         onBulkToggle={handleBulkToggle}
+        onDeselctAll={handleDeselctAll}
         onSync={handleSync}
         lastSyncedAt={lastSyncedAt}
         syncing={syncing}
         bulkProgress={bulkProgress}
+        confirmBulkActions={user?.settings?.confirm_bulk_actions !== 'off'}
       />
 
       <div className="home-main">
         {bulkProgress && (
           <div className="banner banner-info sync-banner">
             <span className="spinner small" style={{ marginRight: 8 }} />
-            {bulkProgress.selected
-              ? `Selecting ${bulkProgress.count.toLocaleString()} creators...`
-              : `Deselecting ${bulkProgress.count.toLocaleString()} creators...`}
+            {`${bulkProgress.selected ? 'Selecting' : 'Deselecting'} creators… ${bulkProgress.done.toLocaleString()} / ${bulkProgress.total.toLocaleString()}`}
           </div>
         )}
 

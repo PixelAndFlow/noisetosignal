@@ -32,6 +32,7 @@ export default function SettingsPage() {
   const [defaultRecency, setDefaultRecency] = useState(s.default_recency_window || 'last_3_days');
   const [defaultMode, setDefaultMode] = useState(s.default_viewing_mode || 'signal');
   const [dataSource, setDataSource] = useState(s.data_source_indicator !== 'off');
+  const [confirmBulk, setConfirmBulk] = useState(s.confirm_bulk_actions !== 'off');
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -102,6 +103,21 @@ export default function SettingsPage() {
           </button>
         </div>
         {syncMsg && <p className="sync-msg">{syncMsg}</p>}
+
+        <div className="setting-row">
+          <div className="setting-label">
+            <span>Confirm bulk actions</span>
+            <span className="setting-desc">Ask before selecting or deselecting all creators</span>
+          </div>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={confirmBulk}
+              onChange={e => { setConfirmBulk(e.target.checked); saveSetting('confirm_bulk_actions', e.target.checked ? 'on' : 'off'); }}
+            />
+            <span className="toggle-track" />
+          </label>
+        </div>
       </section>
 
       <section className="settings-section">
