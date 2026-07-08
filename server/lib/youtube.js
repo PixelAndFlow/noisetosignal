@@ -221,6 +221,18 @@ async function fetchSubscriptions(accessToken) {
   } while (pageToken);
 
   console.log(`fetchSubscriptions: fetched ${subs.length} subscriptions across ${pageCount} page(s)`);
+
+  // Diagnostic only — gated behind DEBUG_SUBSCRIPTIONS so this doesn't run
+  // unconditionally in production. Set DEBUG_SUBSCRIPTIONS=true locally
+  // while investigating ordering/pagination issues (see
+  // noisetosignal-docs/testing/known-issues-log.md).
+  if (process.env.DEBUG_SUBSCRIPTIONS === 'true') {
+    const first5 = subs.slice(0, 5).map(s => s.channel_name);
+    const last5 = subs.slice(-5).map(s => s.channel_name);
+    console.log(`  [DEBUG_SUBSCRIPTIONS] order=alphabetical | first 5: ${first5.join(' | ')}`);
+    console.log(`  [DEBUG_SUBSCRIPTIONS] order=alphabetical | last 5:  ${last5.join(' | ')}`);
+  }
+
   return subs;
 }
 
