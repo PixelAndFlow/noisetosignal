@@ -1,8 +1,11 @@
 # noisetosignal
 
 **Cycle 1: NoiseToSignal**
+Team Members: Marc Delsoin and Mofazzal Hossain
 
-I didn't set out to build a YouTube tool. I set out to understand what it takes to ship something real — from a blank repository to a live, working product that solves a problem I actually have.
+(THIS README IS A WORK IN PROCESS)
+
+We didn't set out to build a YouTube tool. We set out to understand what it takes to ship something real — from a blank repository to a live, working product that solves a problem I actually have.
 
 The foundation was a YouTube replica built from scratch: homepage feed, video search, player, navigation, a bookmark system. Not a tutorial clone — a deliberate re-engineering of a familiar product to understand how it actually works under the hood. React on the frontend, Node.js and Express on the backend, PostgreSQL for persistence, deployed to Render with a CI/CD pipeline tied to GitHub.
 
