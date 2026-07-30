@@ -65,6 +65,19 @@ more than ~15 times within the user's selected window will be missing older
 videos from that window. This is `testing/known-issues-log.md` Issue 002 in
 the docs repo — still open as of this writing.
 
+## Deployment status (checked live, 2026-07-29)
+
+The only Render URL on record, https://viewtube-63vi.onrender.com,
+responds but serves the **old ViewTube build**, not this repo's current
+code — its HTML `<title>` is `ViewTube`, while `client/index.html` on
+`main` says `NoiseToSignal`. Nothing built during the NoiseToSignal
+Phase 1 MVP (commit `59bedd0` onward) is currently live. Needs a manual
+redeploy from `main` plus confirming the real env vars are set in the
+Render dashboard (`DATABASE_URL`, `GOOGLE_CLIENT_ID/SECRET`,
+`YOUTUBE_API_KEY`, `ENCRYPTION_KEY`, `JWT_SECRET`, `CLIENT_URL` — all
+`sync: false` in `render.yaml`, so they don't populate automatically).
+See `testing/known-issues-log.md` Issue 003 in the docs repo.
+
 ## Known platform limitation (not fixable, needs UI language decision)
 
 Subscription sync caps at ~987 channels for accounts with more subscriptions
