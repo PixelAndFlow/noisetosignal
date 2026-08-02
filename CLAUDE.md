@@ -17,7 +17,7 @@ context files — live in a **separate sibling repo**:
 
 Start here in the docs repo when picking work back up:
 - `context-files/2026-07-29-full-build-audit.md` — latest full status audit
-- `decisions/README.md` — the 45-decision unified log (architecture rationale)
+- `decisions/README.md` — the 46-decision unified log (architecture rationale)
 - `testing/known-issues-log.md` — what's actually still broken
 - `decisions/20260620-03-open-items-tracker.md` — the working checklist
 
@@ -69,6 +69,20 @@ counts, real-browser behavior like the YouTube iframe). Still no CI —
 neither suite is wired into any pipeline yet, and Render auto-deploys on
 push to `main` with no gate.
 
+## Recently fixed (2026-08-02)
+
+**YouTube mode showed a broken iframe instead of the "Open YouTube"
+fallback.** Root cause: `HomePage.jsx` relied on the iframe's `onError`
+event to detect an X-Frame-Options block, but Chrome never fires
+`onError` for that case — it fires `onLoad` instead, almost instantly
+(~150ms measured), which the old code didn't handle at all. Fixed by
+treating a suspiciously-fast `onLoad` (<1200ms, via
+`MIN_REAL_IFRAME_LOAD_MS`) as a block signal, with a 3s timeout as a
+backstop for the case where neither event fires. Verified live in a
+real browser against the real youtube.com block, not mocked — see
+`testing/known-issues-log.md` Issue 005 and Decision 046 in the docs
+repo.
+
 ## Known open bug (confirmed root cause, not yet fixed)
 
 **Videos older than ~1 week can be missing from the feed.** Timeframe
@@ -114,3 +128,11 @@ shows a live count derived from the actual synced list rather than a
 hardcoded number, so the UI doesn't currently overclaim — worth a final check
 against `decisions/20260620-03-open-items-tracker.md` Tier 2 before
 considering it closed.
+
+**2026-08-02: escalated to scheduled-to-fix**, not just a passive product
+decision — Marc wants an actual workaround, not only UI-language
+mitigation. Research (Decision 045) recommends a **Google Takeout CSV
+import** as a manual supplemental path (Takeout uses a different,
+non-paginated export mechanism than `subscriptions.list`, so it isn't
+known to hit the same ceiling — not yet empirically confirmed at
+2,000+ subs, that's the next step before building anything).

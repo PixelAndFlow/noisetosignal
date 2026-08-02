@@ -8,6 +8,11 @@ import VideoCard from '../components/VideoCard';
 import './HomePage.css';
 
 const DEFAULT_TIMEFRAME = 'last_3_days';
+// A blocked youtube.com embed still fires the iframe's onLoad event almost
+// instantly (measured ~150ms) once Chrome resolves the blocked navigation —
+// a genuine youtube.com homepage load reliably takes much longer than this.
+// onLoad firing faster than this threshold is treated as a block, not success.
+const MIN_REAL_IFRAME_LOAD_MS = 1200;
 
 export default function HomePage() {
   const { mode } = useMode();
@@ -30,8 +35,31 @@ export default function HomePage() {
   const [showDataSource, setShowDataSource] = useState(user?.settings?.data_source_indicator === 'on');
 
   const iframeRef = useRef(null);
+  const iframeLoadTimeoutRef = useRef(null);
+  const iframeMountedAtRef = useRef(0);
   const [searchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
+
+  // X-Frame-Options/CSP blocks (youtube.com blocks embedding itself) don't
+  // reliably fire the iframe's onError event in Chrome — onError only
+  // covers resource-level failures, not a blocked top-level navigation
+  // inside the frame. onLoad DOES fire even when blocked, though — Chrome
+  // finishes resolving the blocked navigation almost instantly — so a
+  // fast onLoad is actually the block signal, not a success signal. A
+  // fallback timeout also covers the case where neither event fires at all.
+  useEffect(() => {
+    if (mode !== 'youtube') return undefined;
+    setIframeBlocked(false);
+    iframeMountedAtRef.current = Date.now();
+    iframeLoadTimeoutRef.current = setTimeout(() => setIframeBlocked(true), 3000);
+    return () => clearTimeout(iframeLoadTimeoutRef.current);
+  }, [mode]);
+
+  function handleIframeLoad() {
+    clearTimeout(iframeLoadTimeoutRef.current);
+    const elapsed = Date.now() - iframeMountedAtRef.current;
+    setIframeBlocked(elapsed < MIN_REAL_IFRAME_LOAD_MS);
+  }
 
   useEffect(() => {
     if (user?.settings?.default_recency_window) setTimeframe(user.settings.default_recency_window);
@@ -190,6 +218,7 @@ export default function HomePage() {
               src="https://www.youtube.com"
               title="YouTube"
               className="youtube-iframe"
+              onLoad={handleIframeLoad}
               onError={() => setIframeBlocked(true)}
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
             />
