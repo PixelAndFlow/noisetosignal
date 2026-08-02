@@ -53,11 +53,21 @@ all passing as of 2026-08-02) covering DB connectivity, login (JWT-mint
 bypass, not real OAuth), all 8 timeframe filters, creator-filter
 cross-contamination, subscription sync/pagination (incl. a 2,100-sub
 mocked simulation), and a regression test for the RSS-depth bug below. Run
-with `npm test` from `server/` — see `server/tests/README.md` for setup
-and what's intentionally still manual (real OAuth login, real-account
-subscription counts, the client/frontend has no automated tests yet).
-Still no CI — this suite isn't wired into any pipeline yet, and Render
-auto-deploys on push to `main` with no gate.
+with `npm test` from `server/`.
+
+`client/tests/` has a separate Vitest + React Testing Library suite
+(23 tests, all passing as of 2026-08-02) covering `TimeframeFilter`,
+`CreatorPanel` (including a direct regression test for the historical
+hardcoded-999 bug), and a real `vite build` sanity check confirming the
+frontend actually builds. Run with `npm test` from `client/`. Most page
+components (`HomePage`, `WatchPage`, `SettingsPage`) and other components
+(`VideoCard`, `NavBar`, `Sidebar`) are not covered yet.
+
+See `server/tests/README.md` and `client/tests/README.md` for what's
+intentionally still manual (real OAuth login, real-account subscription
+counts, real-browser behavior like the YouTube iframe). Still no CI —
+neither suite is wired into any pipeline yet, and Render auto-deploys on
+push to `main` with no gate.
 
 ## Known open bug (confirmed root cause, not yet fixed)
 

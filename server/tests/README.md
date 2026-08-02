@@ -65,9 +65,10 @@ npm run test:watch   # re-run on file changes
   subscriptions actually syncs to is a manual, on-demand check against the
   live app, not part of this automated suite (see
   `testing/known-issues-log.md` Issue 001 in the docs repo).
-- **Frontend/browser behavior** — the client (React/Vite) has no automated
-  tests yet. UI checks (creator panel, video player, YouTube-mode iframe
-  fallback) stay in `testing-plan-manual.md`.
+- **Frontend component/behavior tests** — those live in `client/tests/`
+  (separate Vitest + Testing Library setup, added 2026-08-02), not here.
+  Real-browser checks (actual YouTube iframe embedding, real OAuth
+  redirect, keyboard shortcuts) still stay in `testing-plan-manual.md`.
 - **CI** — this suite is not yet wired into a GitHub Actions workflow; it
   currently only runs when someone runs `npm test` by hand. See
   `testing/ci-strategy.md` in the docs repo.
