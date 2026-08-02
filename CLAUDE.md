@@ -17,7 +17,7 @@ context files — live in a **separate sibling repo**:
 
 Start here in the docs repo when picking work back up:
 - `context-files/2026-07-29-full-build-audit.md` — latest full status audit
-- `decisions/README.md` — the 48-decision unified log (architecture rationale)
+- `decisions/README.md` — the 49-decision unified log (architecture rationale)
 - `testing/known-issues-log.md` — what's actually still broken
 - `decisions/20260620-03-open-items-tracker.md` — the working checklist
 
@@ -48,13 +48,14 @@ docs repo for the full standard.
   actions, uses `createPortal` for confirmation modals (fixes iframe
   stacking-context issue).
 
-`server/tests/` has an automated Vitest + supertest + nock suite (40 tests,
+`server/tests/` has an automated Vitest + supertest + nock suite (46 tests,
 all passing as of 2026-08-02) covering DB connectivity, login (JWT-mint
 bypass, not real OAuth), all 8 timeframe filters, creator-filter
 cross-contamination, subscription sync/pagination (incl. a 2,100-sub
 mocked simulation), settings persistence (table-driven round-trip for
-every setting key), and a regression test for the RSS-depth bug below. Run
-with `npm test` from `server/`.
+every setting key), OAuth scope config, sanitized error logging (no
+token leakage on sync failure), and a regression test for the RSS-depth
+bug below. Run with `npm test` from `server/`.
 
 `client/tests/` has a separate Vitest + React Testing Library suite
 (23 tests, all passing as of 2026-08-02) covering `TimeframeFilter`,
