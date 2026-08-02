@@ -10,6 +10,7 @@ const ALLOWED_KEYS = new Set([
   'default_recency_window',
   'subscription_sync_frequency',
   'dark_mode',
+  'confirm_bulk_actions',
 ]);
 
 router.get('/', requireAuth, async (req, res) => {
