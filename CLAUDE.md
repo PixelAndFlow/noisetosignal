@@ -17,7 +17,7 @@ context files — live in a **separate sibling repo**:
 
 Start here in the docs repo when picking work back up:
 - `context-files/2026-07-29-full-build-audit.md` — latest full status audit
-- `decisions/README.md` — the 46-decision unified log (architecture rationale)
+- `decisions/README.md` — the 47-decision unified log (architecture rationale)
 - `testing/known-issues-log.md` — what's actually still broken
 - `decisions/20260620-03-open-items-tracker.md` — the working checklist
 
