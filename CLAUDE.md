@@ -69,6 +69,16 @@ counts, real-browser behavior like the YouTube iframe). Still no CI —
 neither suite is wired into any pipeline yet, and Render auto-deploys on
 push to `main` with no gate.
 
+There are two ways to run the server locally — `npm run dev` (real
+`.env`, real Neon DB, real Google login) and `npm run dev:seeded` (real
+`.env` swapped for `.env.test`, local test DB, fake seeded data, no
+OAuth — see `server/tests/README.md` "Browsing the app with fake seeded
+data"). **Both bind port 3001 and only one can run at a time** — the
+client's dev proxy is hardcoded to `localhost:3001`, so whichever
+backend you want has to be the one occupying that port; starting the
+second while the first is up fails with `EADDRINUSE`. The client itself
+is always `localhost:5173` regardless of which backend it's talking to.
+
 ## Recently fixed (2026-08-02)
 
 **YouTube mode showed a broken iframe instead of the "Open YouTube"

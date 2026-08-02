@@ -114,6 +114,28 @@ token has a 24h expiry for convenience).
   against the same database, so there's no risk of this touching real
   user data.
 
+### Ports — both server setups use the same ones, and can't run at once
+
+| | Real dev server (`npm run dev`, from `server/`) | Seeded preview server (`npm run dev:seeded`, from `server/`) |
+|---|---|---|
+| Port | **3001** (from `server/.env`'s `PORT=3001`) | **3001** (forced in `scripts/dev-seeded.js`, overriding `.env.test`'s own `PORT=3999`) |
+| Env file | `server/.env` | `server/.env.test` |
+| Database | Real Neon Postgres | Local `noisetosignal_test` Postgres |
+| Login | Real Google OAuth | Pasted `nts_session` cookie, no OAuth |
+| Data | Your real subscriptions | Fake data from `npm run seed:dev` |
+| Client (`npm run dev`, from `client/`) | Always **5173** (Vite's default — not configured in `vite.config.js`) | Same, **5173** |
+
+Both backend options land on the same port (3001) **on purpose** — the
+client's dev proxy (`client/vite.config.js`) hardcodes its target to
+`http://localhost:3001`, so whichever backend you want the client talking
+to has to be on that exact port. That also means **only one of the two
+backend servers can run at a time** — starting the second while the first
+is still up will fail with `EADDRINUSE` (port already in use). Stop
+whichever one you're not using before starting the other. The client
+itself doesn't change: it's always `http://localhost:5173` either way,
+since it just proxies `/api` requests to whichever real server happens to
+be listening on 3001.
+
 ## Adding a new test
 
 Follow the existing pattern: `resetDb()` in `beforeEach`, seed only what
