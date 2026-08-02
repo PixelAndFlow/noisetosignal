@@ -73,6 +73,47 @@ npm run test:watch   # re-run on file changes
   currently only runs when someone runs `npm test` by hand. See
   `testing/ci-strategy.md` in the docs repo.
 
+## Browsing the app with fake seeded data (no real login)
+
+The automated suites above never render anything in a real browser —
+`supertest` calls the Express app in-process, and `client/tests/` runs in
+`jsdom`, not an actual browser. To actually *see* the interface, with fake
+data instead of your real YouTube account:
+
+```
+# Terminal 1 (from server/): reset the test DB and seed fake data
+npm run seed:dev
+
+# Terminal 2 (from server/): run the real server against the test DB
+npm run dev:seeded
+
+# Terminal 3 (from client/): run the normal client dev server
+npm run dev
+```
+
+Then open `http://localhost:5173`, open the browser devtools console, and
+paste the `document.cookie = "nts_session=...; path=/"; location.reload();`
+line that `npm run seed:dev` prints. That logs you in as a fake "Dev
+Preview" user — no Google OAuth needed — with 40 fake subscriptions (20
+selected) and videos spread across every timeframe bucket, so switching
+filters actually changes what's shown.
+
+Re-run `npm run seed:dev` any time to reset and reseed (it truncates and
+rebuilds the whole test DB, and prints a fresh cookie each time since the
+token has a 24h expiry for convenience).
+
+- `scripts/seed-dev-data.js` — reuses the exact same helpers
+  `server/tests/` uses (`tests/helpers/db.js`, `tests/helpers/auth.js`),
+  so the data shape is identical to what the automated tests exercise.
+- `scripts/dev-seeded.js` — a thin wrapper that loads `.env.test` (so it
+  points at the local test DB, not your real Neon DB) but forces
+  `PORT=3001` since `client/vite.config.js`'s dev proxy is hardcoded to
+  that port.
+- This is completely separate from your normal `npm run dev` (real
+  `.env`, real Neon DB, real Google login) — the two are never running
+  against the same database, so there's no risk of this touching real
+  user data.
+
 ## Adding a new test
 
 Follow the existing pattern: `resetDb()` in `beforeEach`, seed only what
