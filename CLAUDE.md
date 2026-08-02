@@ -17,7 +17,7 @@ context files — live in a **separate sibling repo**:
 
 Start here in the docs repo when picking work back up:
 - `context-files/2026-07-29-full-build-audit.md` — latest full status audit
-- `decisions/README.md` — the 42-decision unified log (architecture rationale)
+- `decisions/README.md` — the 43-decision unified log (architecture rationale)
 - `testing/known-issues-log.md` — what's actually still broken
 - `decisions/20260620-03-open-items-tracker.md` — the working checklist
 
@@ -65,18 +65,25 @@ more than ~15 times within the user's selected window will be missing older
 videos from that window. This is `testing/known-issues-log.md` Issue 002 in
 the docs repo — still open as of this writing.
 
-## Deployment status (checked live, 2026-07-29)
+## Deployment status (checked live, 2026-08-02)
 
-The only Render URL on record, https://viewtube-63vi.onrender.com,
-responds but serves the **old ViewTube build**, not this repo's current
-code — its HTML `<title>` is `ViewTube`, while `client/index.html` on
-`main` says `NoiseToSignal`. Nothing built during the NoiseToSignal
-Phase 1 MVP (commit `59bedd0` onward) is currently live. Needs a manual
-redeploy from `main` plus confirming the real env vars are set in the
-Render dashboard (`DATABASE_URL`, `GOOGLE_CLIENT_ID/SECRET`,
-`YOUTUBE_API_KEY`, `ENCRYPTION_KEY`, `JWT_SECRET`, `CLIENT_URL` — all
-`sync: false` in `render.yaml`, so they don't populate automatically).
-See `testing/known-issues-log.md` Issue 003 in the docs repo.
+**Live at https://noisetosignal.onrender.com/** — confirmed via `curl`
+returning HTTP 200 with `<title>NoiseToSignal</title>`, matching this
+repo's `client/index.html` on `main`. This is a new/different Render
+service from the previously-documented `viewtube-63vi.onrender.com`
+(that one was serving the stale pre-rebuild ViewTube app and is no
+longer the canonical URL — don't use it in new docs or links). OAuth
+and all required env vars (`DATABASE_URL`, `GOOGLE_CLIENT_ID/SECRET`,
+`YOUTUBE_API_KEY`, `ENCRYPTION_KEY`, `JWT_SECRET`, `CLIENT_URL`) are
+confirmed working against this URL. See `testing/known-issues-log.md`
+Issue 003 (resolved) and Decision 043 in the docs repo.
+
+Since Google OAuth app verification hasn't been submitted yet (deferred
+until ~50 active users per Decision 018), every real login currently
+shows Google's "unverified app" warning screen. Sign-in still completes
+past it — this is cosmetic friction, not a bug. Low priority, tracked as
+`testing/known-issues-log.md` Issue 004 / Tier 5 in
+`decisions/20260620-03-open-items-tracker.md`.
 
 ## Known platform limitation (not fixable, needs UI language decision)
 
