@@ -17,7 +17,7 @@ context files — live in a **separate sibling repo**:
 
 Start here in the docs repo when picking work back up:
 - `context-files/2026-07-29-full-build-audit.md` — latest full status audit
-- `decisions/README.md` — the 50-decision unified log (architecture rationale)
+- `decisions/README.md` — the 51-decision unified log (architecture rationale)
 - `testing/known-issues-log.md` — what's actually still broken
 - `decisions/20260620-03-open-items-tracker.md` — the working checklist
 
@@ -163,6 +163,20 @@ known to hit the same ceiling).
 a real Google Takeout export against his actual account and counted the
 `subscriptions.csv` rows directly — **2,144 subscriptions**, no
 truncation, well above the API's ~987 ceiling. The workaround is
-validated with real evidence, not just theory. **Next step: build the
-actual import feature** (CSV upload, parse, reconcile against
-`subscriptions`/`creator_selections`) — not yet started.
+validated with real evidence, not just theory. Marc wants to keep
+looking for a credential-based (non-file-upload) alternative before
+committing to that build, so it's parked as the confirmed-viable
+**backup plan** rather than started.
+
+Two credential-based alternatives were investigated 2026-08-02 and
+Decision 051 covers both: (1) unioning `subscriptions.list` results
+across different `order` values — a diagnostic script exists
+(`server/scripts/diagnose-subscription-order.js`, not yet run) but this
+was downgraded to "cheap to test, not trusted as a solution," since
+there's no way to prove a union result is complete without an
+independent ground truth to check against; (2) Google's Data
+Portability API, which does cover YouTube subscriptions and would
+inherit Takeout's completeness guarantee, but requires an annual
+third-party security assessment (restricted OAuth scope) on top of the
+standard verification already deferred to ~50 users — correctly
+shelved as disproportionate for now, not rejected outright.
