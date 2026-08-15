@@ -9,7 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "seed:dev": "node scripts/seed-dev-data.js",
-    "dev:seeded": "node --watch scripts/dev-seeded.js"
+    "dev:seeded": "node --watch scripts/dev-seeded.js",
+    "diagnose:subs": "node scripts/diagnose-subscription-order.js"
   },
   "dependencies": {
     "axios": "^1.7.9",
