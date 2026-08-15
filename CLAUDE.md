@@ -226,6 +226,17 @@ the repo via Render's Connect dropdown to regenerate the webhook) — not
 fixable from the code repo, needs a human with GitHub/Render access.
 Manual Deploy remains a reliable workaround in the meantime.
 
+**2026-08-08, same day — root cause confirmed.** Render's GitHub App
+installation had repository access limited to `PixelAndFlow/viewtube`
+(the old, no-longer-canonical service) — `noisetosignal` was never in
+its access list, so no webhook event could reach Render for this repo
+at all, independent of the Auto-Deploy setting. Same underlying pattern
+as Decision 043/Issue 003: old-service state outliving the migration.
+Fixed by adding `noisetosignal` to the App's repository access. This
+commit is the live test of that fix — if Render auto-deploys it, the
+next check of the deployed JS bundle's `Last-Modified` header will show
+today's date instead of Aug 6.
+
 This is the same *service* fixed in Decision 043 (a new/different
 Render service from the old `viewtube-63vi.onrender.com`, which served
 the stale pre-rebuild ViewTube app and is no longer canonical) — OAuth
