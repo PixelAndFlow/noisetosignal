@@ -81,6 +81,10 @@ if (isProd) {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`NoiseToSignal server running on port ${PORT}${isProd ? ' (production)' : ''}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`NoiseToSignal server running on port ${PORT}${isProd ? ' (production)' : ''}`);
+  });
+}
+
+module.exports = app;

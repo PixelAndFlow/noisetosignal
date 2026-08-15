@@ -17,7 +17,7 @@ context files — live in a **separate sibling repo**:
 
 Start here in the docs repo when picking work back up:
 - `context-files/2026-07-29-full-build-audit.md` — latest full status audit
-- `decisions/README.md` — the 43-decision unified log (architecture rationale)
+- `decisions/README.md` — the 45-decision unified log (architecture rationale)
 - `testing/known-issues-log.md` — what's actually still broken
 - `decisions/20260620-03-open-items-tracker.md` — the working checklist
 
@@ -48,8 +48,16 @@ docs repo for the full standard.
   actions, uses `createPortal` for confirmation modals (fixes iframe
   stacking-context issue).
 
-No automated tests exist yet (no test framework, no `npm test` in either
-`package.json`). No CI. Render auto-deploys on push to `main` with no gate.
+`server/tests/` has an automated Vitest + supertest + nock suite (30 tests,
+all passing as of 2026-08-02) covering DB connectivity, login (JWT-mint
+bypass, not real OAuth), all 8 timeframe filters, creator-filter
+cross-contamination, subscription sync/pagination (incl. a 2,100-sub
+mocked simulation), and a regression test for the RSS-depth bug below. Run
+with `npm test` from `server/` — see `server/tests/README.md` for setup
+and what's intentionally still manual (real OAuth login, real-account
+subscription counts, the client/frontend has no automated tests yet).
+Still no CI — this suite isn't wired into any pipeline yet, and Render
+auto-deploys on push to `main` with no gate.
 
 ## Known open bug (confirmed root cause, not yet fixed)
 
