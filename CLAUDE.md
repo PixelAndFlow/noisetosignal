@@ -17,7 +17,7 @@ context files — live in a **separate sibling repo**:
 
 Start here in the docs repo when picking work back up:
 - `context-files/2026-07-29-full-build-audit.md` — latest full status audit
-- `decisions/README.md` — the 49-decision unified log (architecture rationale)
+- `decisions/README.md` — the 50-decision unified log (architecture rationale)
 - `testing/known-issues-log.md` — what's actually still broken
 - `decisions/20260620-03-open-items-tracker.md` — the working checklist
 
@@ -157,5 +157,12 @@ decision — Marc wants an actual workaround, not only UI-language
 mitigation. Research (Decision 045) recommends a **Google Takeout CSV
 import** as a manual supplemental path (Takeout uses a different,
 non-paginated export mechanism than `subscriptions.list`, so it isn't
-known to hit the same ceiling — not yet empirically confirmed at
-2,000+ subs, that's the next step before building anything).
+known to hit the same ceiling).
+
+**2026-08-02, same day: confirmed empirically (Decision 050).** Marc ran
+a real Google Takeout export against his actual account and counted the
+`subscriptions.csv` rows directly — **2,144 subscriptions**, no
+truncation, well above the API's ~987 ceiling. The workaround is
+validated with real evidence, not just theory. **Next step: build the
+actual import feature** (CSV upload, parse, reconcile against
+`subscriptions`/`creator_selections`) — not yet started.
