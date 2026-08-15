@@ -203,20 +203,28 @@ the docs repo — still open as of this writing.
 
 ## Deployment status (checked live, 2026-08-06 — ⚠️ STALE DEPLOY, READ THIS)
 
-**Live at https://noisetosignal.onrender.com/, but running a build from
-2026-07-31** — `curl -sI` on the deployed JS bundle shows
-`Last-Modified: Fri, 31 Jul 2026`. Render has not auto-deployed a single
-push since then, despite ~15+ pushes to `main` in the meantime (the
-iframe-fallback fix, the settings-persistence fix, every automated test
-suite, the live sync progress counter — Decisions 047 through 052).
-**Do not assume anything merged after 2026-07-31 is live for real users
-just because it's on `main` and tests pass.** Confirmed by reproducing
-the old broken YouTube-fallback behavior against the real production
-account on 2026-08-06. See `testing/known-issues-log.md` Issue 008 and
-the reopened Tier 1 item in `decisions/20260620-03-open-items-tracker.md`
-— needs a human with Render dashboard access to manually trigger a
-deploy and check whether Auto-Deploy is actually enabled; not something
-fixable from the code repo.
+**Live at https://noisetosignal.onrender.com/, but stuck on stale
+builds** — as of 2026-08-08 the deployed JS bundle's `Last-Modified` is
+Aug 6, matching Render's last *manually* triggered deploy; the creator
+groups / "Most popular" sort / collapsible panel push from the same day
+(commit `3a6986a`) is not live. **Do not assume anything merged after a
+given push is live for real users just because it's on `main` and tests
+pass — check the deployed JS bundle's `Last-Modified` header against the
+commit date first.**
+
+**2026-08-08 update — root cause narrowed.** Auto-Deploy is confirmed
+**on** ("On Commit" in Render's Settings → Build & Deploy) — the earlier
+open question of whether it was disabled is answered, it isn't. But
+Render's Events tab shows every deploy in the service's history as
+"Manually triggered by you via Dashboard" — zero automatic deploys have
+ever fired, despite 15+ pushes to `main` since Jul 31. This points at a
+**broken GitHub webhook/App connection** between Render and
+`PixelAndFlow/noisetosignal`, not a misconfigured toggle. See
+`testing/known-issues-log.md` Issue 008 in the docs repo for the full
+evidence and fix path (check GitHub's webhook delivery logs; reconnect
+the repo via Render's Connect dropdown to regenerate the webhook) — not
+fixable from the code repo, needs a human with GitHub/Render access.
+Manual Deploy remains a reliable workaround in the meantime.
 
 This is the same *service* fixed in Decision 043 (a new/different
 Render service from the old `viewtube-63vi.onrender.com`, which served
