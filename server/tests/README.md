@@ -54,6 +54,8 @@ npm run test:watch   # re-run on file changes
 | `subscription-sync.test.js` | `subscriptions.list` pagination (incl. a 2,100-subscription simulation and the real ~987/1000 ceiling), the 100-page safety cap, sync add/remove reconciliation, and a 2,500-row DB-scale listing check |
 | `rss-depth-regression.test.js` | Reproduces Issue 002 (RSS's 15-video cap silently drops older videos from "last month"+ windows because the API fallback never triggers when RSS succeeds) |
 | `settings.test.js` | Table-driven round-trip test for every setting key (PUT then GET reflects it — this would have caught Issue 007 immediately), plus a dedicated `confirm_bulk_actions` regression test, 400-on-unknown-key, and overwrite-not-duplicate-rows |
+| `oauth-config.test.js` | Asserts the registered passport Google strategy actually requests the `youtube.readonly` scope (plus `profile`/`email`) — a real runtime check against `passport._strategy('google')._scope`, not a source-text guess |
+| `error-logging.test.js` | Forces a real sync failure (mocked 403 from `subscriptions.list`, carrying a genuine Authorization-bearing request) and asserts the access token never leaks into the client response, console output, or `sync_log`/`error_log` rows |
 
 ## What this doesn't cover (stays manual)
 
