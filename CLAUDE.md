@@ -233,9 +233,21 @@ its access list, so no webhook event could reach Render for this repo
 at all, independent of the Auto-Deploy setting. Same underlying pattern
 as Decision 043/Issue 003: old-service state outliving the migration.
 Fixed by adding `noisetosignal` to the App's repository access. This
-commit is the live test of that fix — if Render auto-deploys it, the
-next check of the deployed JS bundle's `Last-Modified` header will show
-today's date instead of Aug 6.
+did **not** resolve it — a fresh push after the fix (`f89eddd`) still
+required a manual deploy. Checked the service's Blueprint's own Syncs
+history separately: syncs stopped 8 days ago and a Manual Sync had no
+effect on the service's deploy history, confirming Blueprint Sync and
+per-service auto-deploy-on-push are different mechanisms. Full trail
+in `testing/known-issues-log.md` Issue 008 in the docs repo, along with
+the support ticket drafted for Render.
+
+**2026-08-09 — Marc reconnected the GitHub repo directly** (disconnect
++ reconnect via the service's Connect option, distinct from both the
+Auto-Deploy toggle and the GitHub App's repository access, both
+already fixed and confirmed insufficient on their own). This commit is
+the live test of that fix — if Render auto-deploys it, the next check
+of the deployed JS bundle's `Last-Modified` header will show today's
+date instead of Aug 6.
 
 This is the same *service* fixed in Decision 043 (a new/different
 Render service from the old `viewtube-63vi.onrender.com`, which served
