@@ -16,7 +16,7 @@ const MIN_REAL_IFRAME_LOAD_MS = 1200;
 
 export default function HomePage() {
   const { mode } = useMode();
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
 
   const [subscriptions, setSubscriptions] = useState([]);
   const [timeframe, setTimeframe] = useState(user?.settings?.default_recency_window || DEFAULT_TIMEFRAME);
@@ -34,6 +34,7 @@ export default function HomePage() {
   const [bulkProgress, setBulkProgress] = useState(null);
   const [iframeBlocked, setIframeBlocked] = useState(false);
   const [showDataSource, setShowDataSource] = useState(user?.settings?.data_source_indicator === 'on');
+  const [groups, setGroups] = useState([]);
 
   const iframeRef = useRef(null);
   const iframeLoadTimeoutRef = useRef(null);
@@ -76,6 +77,62 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => { loadSubscriptions(); }, [loadSubscriptions]);
+
+  const loadGroups = useCallback(async () => {
+    const res = await fetch('/api/creator-groups', { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+    setGroups(data.groups);
+  }, []);
+
+  useEffect(() => { loadGroups(); }, [loadGroups]);
+
+  async function handleSaveGroup(name, channelIds) {
+    const res = await fetch('/api/creator-groups', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, channel_ids: channelIds }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Could not save group');
+    }
+    await loadGroups();
+  }
+
+  async function handleDeleteGroup(groupId) {
+    await fetch(`/api/creator-groups/${groupId}`, { method: 'DELETE', credentials: 'include' });
+    await loadGroups();
+  }
+
+  async function handleUpdateGroup(groupId, channelIds) {
+    await fetch(`/api/creator-groups/${groupId}/members`, {
+      method: 'PUT', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel_ids: channelIds }),
+    });
+    await loadGroups();
+  }
+
+  async function handleApplyGroup(groupId, mode) {
+    const res = await fetch(`/api/creator-groups/${groupId}/apply`, {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode }),
+    });
+    if (!res.ok) return;
+    await loadSubscriptions();
+  }
+
+  async function handleSetGroupSelectBehavior(value) {
+    const res = await fetch('/api/settings/group_select_behavior', {
+      method: 'PUT', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value }),
+    });
+    if (!res.ok) return;
+    setUser(prev => prev ? { ...prev, settings: { ...prev.settings, group_select_behavior: value } } : prev);
+  }
 
   const loadVideos = useCallback(async (off = 0) => {
     const selectedIds = subscriptions.filter(s => s.selected).map(s => s.channel_id);
@@ -263,6 +320,13 @@ export default function HomePage() {
         syncProgressCount={syncProgressCount}
         bulkProgress={bulkProgress}
         confirmBulkActions={user?.settings?.confirm_bulk_actions !== 'off'}
+        groups={groups}
+        groupSelectBehavior={user?.settings?.group_select_behavior || 'ask'}
+        onSaveGroup={handleSaveGroup}
+        onDeleteGroup={handleDeleteGroup}
+        onApplyGroup={handleApplyGroup}
+        onSetGroupSelectBehavior={handleSetGroupSelectBehavior}
+        onUpdateGroup={handleUpdateGroup}
       />
 
       <div className="home-main">
@@ -296,6 +360,7 @@ export default function HomePage() {
           <div className="feed-controls">
             <select className="sort-select" value={sort} onChange={e => setSort(e.target.value)}>
               <option value="newest">Newest first</option>
+              <option value="popular">Most popular</option>
               <option value="creator">By creator</option>
             </select>
           </div>

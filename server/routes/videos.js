@@ -49,7 +49,10 @@ router.get('/feed', requireAuth, async (req, res) => {
   const subMap = {};
   for (const s of subs.rows) subMap[s.channel_id] = s;
 
-  const orderClause = sort === 'creator' ? 'channel_id ASC, published_at DESC' : 'published_at DESC';
+  const orderClause =
+    sort === 'creator' ? 'channel_id ASC, published_at DESC'
+    : sort === 'popular' ? 'view_count DESC NULLS LAST, published_at DESC'
+    : 'published_at DESC';
   const videoRows = await db.query(
     `SELECT * FROM cached_videos
      WHERE channel_id = ANY($1) AND published_at >= $2

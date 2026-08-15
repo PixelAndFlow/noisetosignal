@@ -5,7 +5,8 @@ async function resetDb() {
   await db.query(`
     TRUNCATE TABLE
       error_log, sync_log, events, watched_videos, cached_comments,
-      cached_videos, creator_selections, subscriptions, oauth_tokens,
+      cached_videos, creator_group_members, creator_groups,
+      creator_selections, subscriptions, oauth_tokens,
       user_settings, users
     RESTART IDENTITY CASCADE
   `);
@@ -32,7 +33,8 @@ async function seedUser(overrides = {}) {
      ($1, 'default_recency_window', 'last_3_days'),
      ($1, 'subscription_sync_frequency', 'every_login'),
      ($1, 'dark_mode', 'system'),
-     ($1, 'confirm_bulk_actions', 'on')`,
+     ($1, 'confirm_bulk_actions', 'on'),
+     ($1, 'group_select_behavior', 'ask')`,
     [user.id]
   );
   return user;

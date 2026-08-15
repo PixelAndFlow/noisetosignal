@@ -15,12 +15,56 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 14px 16px 8px;
 }
 .creator-panel-label {
   font-size: 14px;
   font-weight: 600;
+  margin-right: auto;
 }
+
+.creator-collapse-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.creator-collapse-btn:hover { background: var(--bg-hover); }
+
+/* Fully-collapsed state — a thin strip with just a reopen control, per
+   Marc's "fully hidden, not an icon strip" spec (contrast with Sidebar's
+   collapse, which stays icon-visible). .home-main is flex:1 in
+   HomePage.css, so shrinking this panel's own width is all that's
+   needed for the video grid to reclaim the space. */
+.creator-panel-collapsed {
+  width: 36px;
+  align-items: center;
+  padding-top: 14px;
+}
+.creator-panel-reopen {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--text-secondary);
+  background: none;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.creator-panel-reopen:hover { background: var(--bg-hover); color: var(--accent); }
 
 /* Persistent stats row (subscribed count / live progress) */
 .creator-stats {

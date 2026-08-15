@@ -171,3 +171,33 @@ describe('CreatorPanel: jump-to-selected arrows', () => {
     expect(screen.getByTitle('Jump to next selected creator')).not.toBeDisabled();
   });
 });
+
+describe('CreatorPanel: collapse', () => {
+  it('collapsing hides the search input and shows a reopen control', async () => {
+    const user = userEvent.setup();
+    renderPanel({ subscriptions: makeSubs(5, []) });
+
+    expect(screen.getByPlaceholderText('Search creators...')).toBeInTheDocument();
+
+    await user.click(screen.getByTitle('Hide creators panel'));
+
+    expect(screen.queryByPlaceholderText('Search creators...')).not.toBeInTheDocument();
+    expect(screen.getByTitle('Show creators')).toBeInTheDocument();
+  });
+
+  it('reopening restores the full panel, including groups UI', async () => {
+    const user = userEvent.setup();
+    renderPanel({
+      subscriptions: makeSubs(5, []),
+      groups: [{ id: 1, name: 'Tech News', member_count: 3 }],
+    });
+
+    await user.click(screen.getByTitle('Hide creators panel'));
+    expect(screen.queryByText('Tech News')).not.toBeInTheDocument();
+
+    await user.click(screen.getByTitle('Show creators'));
+
+    expect(screen.getByPlaceholderText('Search creators...')).toBeInTheDocument();
+    expect(screen.getByText('Tech News')).toBeInTheDocument();
+  });
+});

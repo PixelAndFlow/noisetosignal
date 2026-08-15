@@ -44,7 +44,8 @@ passport.use(new GoogleStrategy(
            ($1, 'default_recency_window', 'last_3_days'),
            ($1, 'subscription_sync_frequency', 'every_login'),
            ($1, 'dark_mode', 'system'),
-           ($1, 'confirm_bulk_actions', 'on')`,
+           ($1, 'confirm_bulk_actions', 'on'),
+           ($1, 'group_select_behavior', 'ask')`,
           [user.id]
         );
       }

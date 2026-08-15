@@ -17,7 +17,7 @@ context files — live in a **separate sibling repo**:
 
 Start here in the docs repo when picking work back up:
 - `context-files/2026-07-29-full-build-audit.md` — latest full status audit
-- `decisions/README.md` — the 52-decision unified log (architecture rationale)
+- `decisions/README.md` — the 54-decision unified log (architecture rationale)
 - `testing/known-issues-log.md` — what's actually still broken
 - `decisions/20260620-03-open-items-tracker.md` — the working checklist
 
@@ -43,34 +43,59 @@ docs repo for the full standard.
   client every 400ms while a sync is in flight). Single-process assumption;
   would need a shared store if ever run across multiple server instances.
 - `server/routes/videos.js` — feed assembly; filters by `creator_selections`
-  and timeframe. Has a `[FEED FILTER]` guard line that logs any video dropped
-  for belonging to a non-selected channel.
+  and timeframe, `sort` param (`newest`/`popular`/`creator`). Has a
+  `[FEED FILTER]` guard line that logs any video dropped for belonging to a
+  non-selected channel.
+- `server/routes/creatorGroups.js` — saved creator groups (`creator_groups` +
+  `creator_group_members` tables). `POST /:id/apply` intersects group
+  membership with *current* `subscriptions` before writing
+  `creator_selections`, so a channel left in a group after unsubscribing is
+  silently skipped rather than producing an orphaned feed row.
+  `mode=replace` and `PUT /:id/members` (redefine an existing group's
+  channel list, full replace not merge) both use `server/lib/db.js`'s
+  `withTransaction` helper (the codebase's first use of transactions) so a
+  concurrent `GET /feed` or `GET /` can't land between the delete and the
+  re-insert.
 - `server/middleware/auth.js` — JWT (15min access / 30d refresh), OAuth
   token refresh.
 - `server/lib/crypto.js` — AES-256-GCM encryption for stored OAuth tokens.
 - `client/src/context/` — Auth, Theme, Mode contexts.
 - `client/src/components/CreatorPanel.jsx` — creator search/select, bulk
   actions, uses `createPortal` for confirmation modals (fixes iframe
-  stacking-context issue).
+  stacking-context issue). Collapsible (fully hidden, not an icon strip)
+  via local state; renders `CreatorGroups.jsx` between the view-toggle row
+  and the select-all button.
+- `client/src/components/CreatorGroups.jsx` — save/apply/update/delete
+  creator groups; Replace-vs-Add is asked via a modal unless the user's
+  `group_select_behavior` setting (`ask`/`replace`/`add`) says otherwise.
+  "Update to current selection" (⟳) redefines an existing group's channel
+  list to match whatever's currently checked in the panel — confirmed via
+  a dialog naming the real group and selected count, since it's a full
+  replace of the group's saved list, not a merge.
 
-`server/tests/` has an automated Vitest + supertest + nock suite (48 tests,
-all passing as of 2026-08-03) covering DB connectivity, login (JWT-mint
-bypass, not real OAuth), all 8 timeframe filters, creator-filter
-cross-contamination, subscription sync/pagination (incl. a 2,100-sub
-mocked simulation), the live sync progress counter (monotonic increase +
-clear-on-completion, including on failure), settings persistence
-(table-driven round-trip for every setting key), OAuth scope config,
+`server/tests/` has an automated Vitest + supertest + nock suite (69 tests,
+all passing as of 2026-08-08) covering DB connectivity, login (JWT-mint
+bypass, not real OAuth), all 8 timeframe filters + `popular` sort,
+creator-filter cross-contamination, subscription sync/pagination (incl. a
+2,100-sub mocked simulation), the live sync progress counter (monotonic
+increase + clear-on-completion, including on failure), settings
+persistence (table-driven round-trip for every setting key), creator
+groups (create/list/delete, Replace vs. Add apply semantics, membership
+editing via `PUT /:id/members`, stale-channel skipping, and a
+deterministic `withTransaction` rollback proof), OAuth scope config,
 sanitized error logging (no token leakage on sync failure), and a
 regression test for the RSS-depth bug below. Run with `npm test` from
 `server/`.
 
 `client/tests/` has a separate Vitest + React Testing Library suite
-(23 tests, all passing as of 2026-08-02) covering `TimeframeFilter`,
+(42 tests, all passing as of 2026-08-08) covering `TimeframeFilter`,
 `CreatorPanel` (including a direct regression test for the historical
-hardcoded-999 bug), and a real `vite build` sanity check confirming the
-frontend actually builds. Run with `npm test` from `client/`. Most page
-components (`HomePage`, `WatchPage`, `SettingsPage`) and other components
-(`VideoCard`, `NavBar`, `Sidebar`) are not covered yet.
+hardcoded-999 bug, plus collapse/reopen), `CreatorGroups` (save, apply
+with/without the remember-choice modal, update-to-current-selection,
+delete, 409 handling), and a real `vite build` sanity check confirming
+the frontend actually builds. Run with `npm test` from `client/`. Most
+page components (`HomePage`, `WatchPage`, `SettingsPage`) and other
+components (`VideoCard`, `NavBar`, `Sidebar`) are not covered yet.
 
 See `server/tests/README.md` and `client/tests/README.md` for what's
 intentionally still manual (real OAuth login, real-account subscription
@@ -88,7 +113,38 @@ backend you want has to be the one occupying that port; starting the
 second while the first is up fails with `EADDRINUSE`. The client itself
 is always `localhost:5173` regardless of which backend it's talking to.
 
+## Recently added (2026-08-08)
+
+> ⚠️ Verified in the code and locally, but see "Deployment status" below —
+> Render has been stuck on a 2026-07-31 build, so this is not confirmed
+> live for real users yet.
+
+**Creator groups, "Most popular" sort, collapsible creator panel.** See
+Decision 053 in the docs repo for full detail. Save the current creator
+selection as a named group and re-apply it later (Replace or Add, asked
+via modal the first time or whenever `group_select_behavior` is `ask`,
+with a "remember my choice" override in Settings). "Most popular" reorders
+the existing Signal-mode grid by view count — deliberately scoped to the
+*current* creator selection, not a global/algorithmic trending feed, to
+protect Signal mode's "no algorithm" positioning; a full "discovery"
+section pulling from all subscriptions regardless of selection was scoped
+but explicitly deferred (Tier 4 tracker). The creator panel can now be
+fully collapsed (not just narrowed to an icon strip) to give the video
+grid more room. Verified: `server/tests/creator-groups.test.js` (14/14,
+incl. a deterministic transaction-rollback proof) and
+`server/tests/video-sort.test.js` (3/3); `client/tests/CreatorGroups.test.jsx`
+(15 tests) and new `CreatorPanel.test.jsx` collapse coverage; full suites
+green (server 66/66, client 38/38); live walkthrough against the seeded
+dev-preview environment confirmed the popular-sort reorder against real
+`view_count` values, Add as a true union, Replace as a full swap, and the
+remembered choice persisting across a reload.
+
 ## Recently added (2026-08-03)
+
+> ⚠️ Everything in this section and "Recently fixed" below is verified
+> *in the code* (automated tests, local/dev-preview browser testing) but
+> **not yet confirmed live** — see "Deployment status" above. Render has
+> been stuck on a 2026-07-31 build.
 
 **Live sync progress counter.** "Syncing..." previously just showed a
 spinner with no indication of progress. `subscriptions.list` sync is one
@@ -145,18 +201,30 @@ more than ~15 times within the user's selected window will be missing older
 videos from that window. This is `testing/known-issues-log.md` Issue 002 in
 the docs repo — still open as of this writing.
 
-## Deployment status (checked live, 2026-08-02)
+## Deployment status (checked live, 2026-08-06 — ⚠️ STALE DEPLOY, READ THIS)
 
-**Live at https://noisetosignal.onrender.com/** — confirmed via `curl`
-returning HTTP 200 with `<title>NoiseToSignal</title>`, matching this
-repo's `client/index.html` on `main`. This is a new/different Render
-service from the previously-documented `viewtube-63vi.onrender.com`
-(that one was serving the stale pre-rebuild ViewTube app and is no
-longer the canonical URL — don't use it in new docs or links). OAuth
+**Live at https://noisetosignal.onrender.com/, but running a build from
+2026-07-31** — `curl -sI` on the deployed JS bundle shows
+`Last-Modified: Fri, 31 Jul 2026`. Render has not auto-deployed a single
+push since then, despite ~15+ pushes to `main` in the meantime (the
+iframe-fallback fix, the settings-persistence fix, every automated test
+suite, the live sync progress counter — Decisions 047 through 052).
+**Do not assume anything merged after 2026-07-31 is live for real users
+just because it's on `main` and tests pass.** Confirmed by reproducing
+the old broken YouTube-fallback behavior against the real production
+account on 2026-08-06. See `testing/known-issues-log.md` Issue 008 and
+the reopened Tier 1 item in `decisions/20260620-03-open-items-tracker.md`
+— needs a human with Render dashboard access to manually trigger a
+deploy and check whether Auto-Deploy is actually enabled; not something
+fixable from the code repo.
+
+This is the same *service* fixed in Decision 043 (a new/different
+Render service from the old `viewtube-63vi.onrender.com`, which served
+the stale pre-rebuild ViewTube app and is no longer canonical) — OAuth
 and all required env vars (`DATABASE_URL`, `GOOGLE_CLIENT_ID/SECRET`,
-`YOUTUBE_API_KEY`, `ENCRYPTION_KEY`, `JWT_SECRET`, `CLIENT_URL`) are
-confirmed working against this URL. See `testing/known-issues-log.md`
-Issue 003 (resolved) and Decision 043 in the docs repo.
+`YOUTUBE_API_KEY`, `ENCRYPTION_KEY`, `JWT_SECRET`, `CLIENT_URL`) were
+confirmed working against it as of that build. See
+`testing/known-issues-log.md` Issue 003 (resolved) and Decision 043.
 
 Since Google OAuth app verification hasn't been submitted yet (deferred
 until ~50 active users per Decision 018), every real login currently

@@ -11,6 +11,12 @@ const SYNC_FREQ_OPTIONS = [
   { value: 'manual_only', label: 'Manual only' },
 ];
 
+const GROUP_SELECT_OPTIONS = [
+  { value: 'ask', label: 'Always ask' },
+  { value: 'replace', label: 'Always replace' },
+  { value: 'add', label: 'Always add' },
+];
+
 const RECENCY_OPTIONS = [
   { value: 'last_hour', label: 'Last hour' },
   { value: 'last_8_hours', label: 'Last 8 hours' },
@@ -33,6 +39,7 @@ export default function SettingsPage() {
   const [defaultMode, setDefaultMode] = useState(s.default_viewing_mode || 'signal');
   const [dataSource, setDataSource] = useState(s.data_source_indicator !== 'off');
   const [confirmBulk, setConfirmBulk] = useState(s.confirm_bulk_actions !== 'off');
+  const [groupSelectBehavior, setGroupSelectBehavior] = useState(s.group_select_behavior || 'ask');
   const [syncing, setSyncing] = useState(false);
   const [syncProgressCount, setSyncProgressCount] = useState(null);
   const [syncMsg, setSyncMsg] = useState(null);
@@ -135,6 +142,20 @@ export default function SettingsPage() {
             />
             <span className="toggle-track" />
           </label>
+        </div>
+
+        <div className="setting-row">
+          <div className="setting-label">
+            <span>Applying a creator group</span>
+            <span className="setting-desc">Replace your current selection or add to it</span>
+          </div>
+          <select
+            className="setting-select"
+            value={groupSelectBehavior}
+            onChange={e => { setGroupSelectBehavior(e.target.value); saveSetting('group_select_behavior', e.target.value); }}
+          >
+            {GROUP_SELECT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
         </div>
       </section>
 

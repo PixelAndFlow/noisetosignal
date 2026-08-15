@@ -11,6 +11,7 @@ const videosRouter = require('./routes/videos');
 const commentsRouter = require('./routes/comments');
 const settingsRouter = require('./routes/settings');
 const eventsRouter = require('./routes/events');
+const creatorGroupsRouter = require('./routes/creatorGroups');
 const { requireAuth } = require('./middleware/auth');
 const db = require('./lib/db');
 
@@ -29,6 +30,7 @@ app.use(passport.initialize());
 app.use('/api', apiLimiter);
 app.use('/api/auth', authRouter);
 app.use('/api/subscriptions', subscriptionsRouter);
+app.use('/api/creator-groups', creatorGroupsRouter);
 app.use('/api/videos', videosRouter);
 app.use('/api/comments', commentsRouter);
 app.use('/api/settings', settingsRouter);

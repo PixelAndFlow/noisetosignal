@@ -1,16 +1,20 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import CreatorGroups from './CreatorGroups';
 import './CreatorPanel.css';
 
 export default function CreatorPanel({
   subscriptions, onToggle, onBulkToggle, onDeselctAll, onSync,
   lastSyncedAt, syncing, syncProgressCount, bulkProgress, confirmBulkActions,
+  groups = [], groupSelectBehavior = 'ask',
+  onSaveGroup, onDeleteGroup, onApplyGroup, onSetGroupSelectBehavior, onUpdateGroup,
 }) {
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState('all'); // 'all' | 'selected'
   const [confirmDeselect, setConfirmDeselect] = useState(null);
   const [confirmBulk, setConfirmBulk] = useState(null);
   const [jumpIdx, setJumpIdx] = useState(0);
+  const [collapsed, setCollapsed] = useState(false);
   const listRef = useRef(null);
 
   // Search filter — always applied first
@@ -26,7 +30,10 @@ export default function CreatorPanel({
   [searchFiltered, viewMode]);
 
   const totalCount = subscriptions.length;
-  const selectedCount = subscriptions.filter(s => s.selected).length;
+  const selectedChannelIds = useMemo(() =>
+    subscriptions.filter(s => s.selected).map(s => s.channel_id),
+  [subscriptions]);
+  const selectedCount = selectedChannelIds.length;
   const allDisplayedSelected = displayed.length > 0 && displayed.every(s => s.selected);
 
   // Indices within `displayed` that are selected — used for jump navigation
@@ -106,11 +113,34 @@ export default function CreatorPanel({
     return `Updated ${Math.floor(hrs / 24)}d ago`;
   }, [lastSyncedAt]);
 
+  if (collapsed) {
+    return (
+      <div className="creator-panel creator-panel-collapsed">
+        <button
+          className="creator-panel-reopen"
+          onClick={() => setCollapsed(false)}
+          aria-label="Show creators panel"
+          title="Show creators"
+        >
+          ›
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="creator-panel">
 
       <div className="creator-panel-header">
         <span className="creator-panel-label">Creators</span>
+        <button
+          className="creator-collapse-btn"
+          onClick={() => setCollapsed(true)}
+          aria-label="Hide creators panel"
+          title="Hide creators panel"
+        >
+          «
+        </button>
         <button className="sync-btn" onClick={onSync} disabled={syncing} title="Sync subscriptions">
           {syncing ? <span className="spinner small" /> : '↻'}
         </button>
@@ -177,6 +207,17 @@ export default function CreatorPanel({
           >↓</button>
         </div>
       </div>
+
+      <CreatorGroups
+        groups={groups}
+        selectedChannelIds={selectedChannelIds}
+        groupSelectBehavior={groupSelectBehavior}
+        onSaveGroup={onSaveGroup}
+        onDeleteGroup={onDeleteGroup}
+        onApplyGroup={onApplyGroup}
+        onSetGroupSelectBehavior={onSetGroupSelectBehavior}
+        onUpdateGroup={onUpdateGroup}
+      />
 
       {displayed.length > 0 && (
         <div className="creator-bulk">

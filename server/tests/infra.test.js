@@ -20,7 +20,8 @@ describe('infra: database', () => {
     const tables = result.rows.map(r => r.table_name);
     for (const expected of [
       'users', 'user_settings', 'oauth_tokens', 'subscriptions',
-      'creator_selections', 'cached_videos', 'cached_comments',
+      'creator_selections', 'creator_groups', 'creator_group_members',
+      'cached_videos', 'cached_comments',
       'watched_videos', 'events', 'sync_log', 'error_log',
     ]) {
       expect(tables).toContain(expected);

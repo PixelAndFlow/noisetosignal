@@ -17,6 +17,7 @@ const SETTINGS_ROUND_TRIP_CASES = [
   ['subscription_sync_frequency', 'manual_only'],
   ['dark_mode', 'dark'],
   ['confirm_bulk_actions', 'off'],
+  ['group_select_behavior', 'replace'],
 ];
 
 describe('settings persistence', () => {

@@ -47,6 +47,25 @@ CREATE TABLE IF NOT EXISTS creator_selections (
   UNIQUE(user_id, channel_id)
 );
 
+CREATE TABLE IF NOT EXISTS creator_groups (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS creator_group_members (
+  id SERIAL PRIMARY KEY,
+  group_id INTEGER REFERENCES creator_groups(id) ON DELETE CASCADE,
+  channel_id TEXT NOT NULL,
+  added_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(group_id, channel_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_creator_groups_user ON creator_groups(user_id);
+CREATE INDEX IF NOT EXISTS idx_creator_group_members_group ON creator_group_members(group_id);
+
 CREATE TABLE IF NOT EXISTS cached_videos (
   id SERIAL PRIMARY KEY,
   channel_id TEXT NOT NULL,

@@ -11,7 +11,17 @@ const ALLOWED_KEYS = new Set([
   'subscription_sync_frequency',
   'dark_mode',
   'confirm_bulk_actions',
+  'group_select_behavior',
 ]);
+
+// Opt-in enum validation, scoped to specific keys only. Unlike the other
+// settings above (loosely typed by design, read defensively client-side,
+// e.g. `!== 'off'`), a garbled group_select_behavior wouldn't just fail to
+// save silently — it could skip the replace/add confirmation on a
+// destructive action. Not retrofitted onto the existing keys above.
+const KEY_VALIDATORS = {
+  group_select_behavior: v => ['ask', 'replace', 'add'].includes(v),
+};
 
 router.get('/', requireAuth, async (req, res) => {
   const result = await db.query(
@@ -28,6 +38,10 @@ router.put('/:key', requireAuth, async (req, res) => {
   const { value } = req.body;
   if (!ALLOWED_KEYS.has(key)) return res.status(400).json({ error: 'Unknown setting' });
   if (value === undefined || value === null) return res.status(400).json({ error: 'value required' });
+  const validate = KEY_VALIDATORS[key];
+  if (validate && !validate(String(value))) {
+    return res.status(400).json({ error: 'Invalid value for setting' });
+  }
 
   await db.query(
     `INSERT INTO user_settings (user_id, setting_key, setting_value, updated_at)
