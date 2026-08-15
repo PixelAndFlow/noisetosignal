@@ -29,6 +29,7 @@ export default function HomePage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgressCount, setSyncProgressCount] = useState(null);
   const [syncBanner, setSyncBanner] = useState(null);
   const [bulkProgress, setBulkProgress] = useState(null);
   const [iframeBlocked, setIframeBlocked] = useState(false);
@@ -118,7 +119,24 @@ export default function HomePage() {
   async function handleSync() {
     setSyncing(true);
     setSyncBanner(null);
+    setSyncProgressCount(null);
+
+    // The server fetches subscriptions from YouTube page by page in one
+    // long request/response — poll a lightweight progress endpoint on the
+    // side so the UI can show a live count instead of just a spinner.
+    const progressInterval = setInterval(async () => {
+      try {
+        const pRes = await fetch('/api/subscriptions/sync/progress', { credentials: 'include' });
+        if (pRes.ok) {
+          const { current } = await pRes.json();
+          if (current != null) setSyncProgressCount(current);
+        }
+      } catch { /* polling is best-effort */ }
+    }, 400);
+
     const res = await fetch('/api/subscriptions/sync', { method: 'POST', credentials: 'include' });
+    clearInterval(progressInterval);
+    setSyncProgressCount(null);
     setSyncing(false);
     if (res.ok) {
       const data = await res.json();
@@ -242,6 +260,7 @@ export default function HomePage() {
         onSync={handleSync}
         lastSyncedAt={lastSyncedAt}
         syncing={syncing}
+        syncProgressCount={syncProgressCount}
         bulkProgress={bulkProgress}
         confirmBulkActions={user?.settings?.confirm_bulk_actions !== 'off'}
       />

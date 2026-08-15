@@ -11,7 +11,7 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env.test'), override: true });
 
 const {
-  resetDb, seedUser, seedSubscriptions, seedSelections, seedCachedVideo,
+  resetDb, seedUser, seedOAuthToken, seedSubscriptions, seedSelections, seedCachedVideo,
 } = require('../tests/helpers/db');
 const { sessionCookieFor } = require('../tests/helpers/auth');
 const db = require('../lib/db');
@@ -42,6 +42,15 @@ async function main() {
   const user = await seedUser({
     email: 'dev-preview@example.com',
     displayName: 'Dev Preview',
+  });
+
+  // Far-future expiry + a fake token so getAccessToken() succeeds without
+  // ever needing a real refresh — lets "Sync now" work end to end against
+  // the mocked YouTube API set up in dev-seeded.js, no real Google account
+  // needed.
+  await seedOAuthToken(user.id, {
+    accessToken: 'fake-dev-preview-access-token',
+    expiresAt: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000),
   });
 
   const TOTAL_CHANNELS = 40;

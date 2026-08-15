@@ -34,6 +34,7 @@ export default function SettingsPage() {
   const [dataSource, setDataSource] = useState(s.data_source_indicator !== 'off');
   const [confirmBulk, setConfirmBulk] = useState(s.confirm_bulk_actions !== 'off');
   const [syncing, setSyncing] = useState(false);
+  const [syncProgressCount, setSyncProgressCount] = useState(null);
   const [syncMsg, setSyncMsg] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
@@ -49,7 +50,21 @@ export default function SettingsPage() {
   async function handleSync() {
     setSyncing(true);
     setSyncMsg(null);
+    setSyncProgressCount(null);
+
+    const progressInterval = setInterval(async () => {
+      try {
+        const pRes = await fetch('/api/subscriptions/sync/progress', { credentials: 'include' });
+        if (pRes.ok) {
+          const { current } = await pRes.json();
+          if (current != null) setSyncProgressCount(current);
+        }
+      } catch { /* polling is best-effort */ }
+    }, 400);
+
     const res = await fetch('/api/subscriptions/sync', { method: 'POST', credentials: 'include' });
+    clearInterval(progressInterval);
+    setSyncProgressCount(null);
     setSyncing(false);
     if (res.ok) {
       const data = await res.json();
@@ -103,6 +118,9 @@ export default function SettingsPage() {
           </button>
         </div>
         {syncMsg && <p className="sync-msg">{syncMsg}</p>}
+        {syncing && syncProgressCount != null && (
+          <p className="sync-msg">Syncing… {syncProgressCount.toLocaleString()} subscriptions found so far</p>
+        )}
 
         <div className="setting-row">
           <div className="setting-label">

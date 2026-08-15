@@ -17,7 +17,7 @@ context files — live in a **separate sibling repo**:
 
 Start here in the docs repo when picking work back up:
 - `context-files/2026-07-29-full-build-audit.md` — latest full status audit
-- `decisions/README.md` — the 51-decision unified log (architecture rationale)
+- `decisions/README.md` — the 52-decision unified log (architecture rationale)
 - `testing/known-issues-log.md` — what's actually still broken
 - `decisions/20260620-03-open-items-tracker.md` — the working checklist
 
@@ -36,7 +36,12 @@ docs repo for the full standard.
 
 - `server/lib/youtube.js` — RSS-first video fetching (`fetchRSSVideos`,
   0 quota) with YouTube Data API v3 fallback (`fetchAPIVideos`). Subscription
-  sync paginates `subscriptions.list` with `order: 'alphabetical'`.
+  sync paginates `subscriptions.list` with `order: 'alphabetical'`. Tracks
+  live per-user sync progress in an in-memory `Map` (`getSyncProgress`/
+  `clearSyncProgress`) updated after each page — powers the live "Syncing…
+  N found" counter (`GET /api/subscriptions/sync/progress`, polled by the
+  client every 400ms while a sync is in flight). Single-process assumption;
+  would need a shared store if ever run across multiple server instances.
 - `server/routes/videos.js` — feed assembly; filters by `creator_selections`
   and timeframe. Has a `[FEED FILTER]` guard line that logs any video dropped
   for belonging to a non-selected channel.
@@ -48,14 +53,16 @@ docs repo for the full standard.
   actions, uses `createPortal` for confirmation modals (fixes iframe
   stacking-context issue).
 
-`server/tests/` has an automated Vitest + supertest + nock suite (46 tests,
-all passing as of 2026-08-02) covering DB connectivity, login (JWT-mint
+`server/tests/` has an automated Vitest + supertest + nock suite (48 tests,
+all passing as of 2026-08-03) covering DB connectivity, login (JWT-mint
 bypass, not real OAuth), all 8 timeframe filters, creator-filter
 cross-contamination, subscription sync/pagination (incl. a 2,100-sub
-mocked simulation), settings persistence (table-driven round-trip for
-every setting key), OAuth scope config, sanitized error logging (no
-token leakage on sync failure), and a regression test for the RSS-depth
-bug below. Run with `npm test` from `server/`.
+mocked simulation), the live sync progress counter (monotonic increase +
+clear-on-completion, including on failure), settings persistence
+(table-driven round-trip for every setting key), OAuth scope config,
+sanitized error logging (no token leakage on sync failure), and a
+regression test for the RSS-depth bug below. Run with `npm test` from
+`server/`.
 
 `client/tests/` has a separate Vitest + React Testing Library suite
 (23 tests, all passing as of 2026-08-02) covering `TimeframeFilter`,
@@ -80,6 +87,24 @@ client's dev proxy is hardcoded to `localhost:3001`, so whichever
 backend you want has to be the one occupying that port; starting the
 second while the first is up fails with `EADDRINUSE`. The client itself
 is always `localhost:5173` regardless of which backend it's talking to.
+
+## Recently added (2026-08-03)
+
+**Live sync progress counter.** "Syncing..." previously just showed a
+spinner with no indication of progress. `subscriptions.list` sync is one
+long server-side request (unlike bulk creator select/deselect, which is
+client-driven batching), so there was no existing channel to report
+incremental progress — added a lightweight in-memory per-user tracker
+(`server/lib/youtube.js`'s `getSyncProgress`/`clearSyncProgress`, updated
+after each page in `fetchSubscriptions`) plus a polling endpoint
+(`GET /api/subscriptions/sync/progress`) that `HomePage.jsx` and
+`SettingsPage.jsx` poll every 400ms while a sync is in flight. UI now
+shows "Syncing… N found" instead of just a spinner. Verified with a real
+curl-driven sync against the seeded dev-preview environment (progress
+went 50 → 150 → 250 → cleared to null on completion) and a dedicated
+automated test (`server/tests/sync-progress.test.js`) using realistic
+per-page delays to assert monotonic increase and correct clearing on
+both success and failure paths.
 
 ## Recently fixed (2026-08-02)
 

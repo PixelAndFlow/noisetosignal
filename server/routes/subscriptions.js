@@ -1,64 +1,68 @@
 const express = require('express');
 const db = require('../lib/db');
-const { fetchSubscriptions } = require('../lib/youtube');
+const { fetchSubscriptions, getSyncProgress, clearSyncProgress } = require('../lib/youtube');
 const { requireAuth, getAccessToken } = require('../middleware/auth');
 const { syncLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
 async function syncSubscriptions(userId) {
-  const accessToken = await getAccessToken(userId);
-  const remoteSubs = await fetchSubscriptions(accessToken);
+  try {
+    const accessToken = await getAccessToken(userId);
+    const remoteSubs = await fetchSubscriptions(accessToken, userId);
 
-  const existing = await db.query('SELECT channel_id FROM subscriptions WHERE user_id = $1', [userId]);
-  const existingIds = new Set(existing.rows.map(r => r.channel_id));
-  const remoteIds = new Set(remoteSubs.map(s => s.channel_id));
+    const existing = await db.query('SELECT channel_id FROM subscriptions WHERE user_id = $1', [userId]);
+    const existingIds = new Set(existing.rows.map(r => r.channel_id));
+    const remoteIds = new Set(remoteSubs.map(s => s.channel_id));
 
-  let added = 0;
-  let removed = 0;
-  const removedFromFilter = [];
+    let added = 0;
+    let removed = 0;
+    const removedFromFilter = [];
 
-  for (const sub of remoteSubs) {
-    if (!existingIds.has(sub.channel_id)) {
-      await db.query(
-        `INSERT INTO subscriptions (user_id, channel_id, channel_name, channel_avatar_url, last_synced_at)
-         VALUES ($1, $2, $3, $4, NOW())
-         ON CONFLICT (user_id, channel_id) DO UPDATE SET channel_name = EXCLUDED.channel_name, channel_avatar_url = EXCLUDED.channel_avatar_url, last_synced_at = NOW()`,
-        [userId, sub.channel_id, sub.channel_name, sub.channel_avatar_url]
-      );
-      added++;
-    } else {
-      await db.query(
-        'UPDATE subscriptions SET last_synced_at = NOW() WHERE user_id = $1 AND channel_id = $2',
-        [userId, sub.channel_id]
-      );
-    }
-  }
-
-  for (const id of existingIds) {
-    if (!remoteIds.has(id)) {
-      const inFilter = await db.query(
-        'SELECT channel_id FROM creator_selections WHERE user_id = $1 AND channel_id = $2',
-        [userId, id]
-      );
-      if (inFilter.rows.length > 0) {
-        const sub = existing.rows.find(r => r.channel_id === id);
-        removedFromFilter.push(sub?.channel_id);
-        await db.query('DELETE FROM creator_selections WHERE user_id = $1 AND channel_id = $2', [userId, id]);
+    for (const sub of remoteSubs) {
+      if (!existingIds.has(sub.channel_id)) {
+        await db.query(
+          `INSERT INTO subscriptions (user_id, channel_id, channel_name, channel_avatar_url, last_synced_at)
+           VALUES ($1, $2, $3, $4, NOW())
+           ON CONFLICT (user_id, channel_id) DO UPDATE SET channel_name = EXCLUDED.channel_name, channel_avatar_url = EXCLUDED.channel_avatar_url, last_synced_at = NOW()`,
+          [userId, sub.channel_id, sub.channel_name, sub.channel_avatar_url]
+        );
+        added++;
+      } else {
+        await db.query(
+          'UPDATE subscriptions SET last_synced_at = NOW() WHERE user_id = $1 AND channel_id = $2',
+          [userId, sub.channel_id]
+        );
       }
-      await db.query('DELETE FROM subscriptions WHERE user_id = $1 AND channel_id = $2', [userId, id]);
-      removed++;
     }
+
+    for (const id of existingIds) {
+      if (!remoteIds.has(id)) {
+        const inFilter = await db.query(
+          'SELECT channel_id FROM creator_selections WHERE user_id = $1 AND channel_id = $2',
+          [userId, id]
+        );
+        if (inFilter.rows.length > 0) {
+          const sub = existing.rows.find(r => r.channel_id === id);
+          removedFromFilter.push(sub?.channel_id);
+          await db.query('DELETE FROM creator_selections WHERE user_id = $1 AND channel_id = $2', [userId, id]);
+        }
+        await db.query('DELETE FROM subscriptions WHERE user_id = $1 AND channel_id = $2', [userId, id]);
+        removed++;
+      }
+    }
+
+    const outcome = added === 0 && removed === 0 ? 'no_changes' : 'success';
+    await db.query(
+      `INSERT INTO sync_log (user_id, sync_type, outcome, channels_added, channels_removed)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [userId, 'auto', outcome, added, removed]
+    );
+
+    return { added, removed, removedFromFilter, outcome };
+  } finally {
+    clearSyncProgress(userId);
   }
-
-  const outcome = added === 0 && removed === 0 ? 'no_changes' : 'success';
-  await db.query(
-    `INSERT INTO sync_log (user_id, sync_type, outcome, channels_added, channels_removed)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [userId, 'auto', outcome, added, removed]
-  );
-
-  return { added, removed, removedFromFilter, outcome };
 }
 
 router.get('/', requireAuth, async (req, res) => {
@@ -102,6 +106,10 @@ router.post('/sync', requireAuth, syncLimiter, async (req, res) => {
     }
     res.status(500).json({ error: 'Sync failed. Please try again.' });
   }
+});
+
+router.get('/sync/progress', requireAuth, (req, res) => {
+  res.json({ current: getSyncProgress(req.user.id) });
 });
 
 router.get('/sync/status', requireAuth, async (req, res) => {

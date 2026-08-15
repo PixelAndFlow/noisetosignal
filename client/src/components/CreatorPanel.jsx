@@ -4,7 +4,7 @@ import './CreatorPanel.css';
 
 export default function CreatorPanel({
   subscriptions, onToggle, onBulkToggle, onDeselctAll, onSync,
-  lastSyncedAt, syncing, bulkProgress, confirmBulkActions,
+  lastSyncedAt, syncing, syncProgressCount, bulkProgress, confirmBulkActions,
 }) {
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState('all'); // 'all' | 'selected'
@@ -135,7 +135,9 @@ export default function CreatorPanel({
       </div>
 
       <div className="last-synced" onClick={onSync} title="Tap to sync">
-        {syncing ? 'Syncing...' : syncLabel()}
+        {syncing
+          ? (syncProgressCount ? `Syncing… ${syncProgressCount.toLocaleString()} found` : 'Syncing...')
+          : syncLabel()}
       </div>
 
       <div className="creator-search-wrap">

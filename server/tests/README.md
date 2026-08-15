@@ -56,6 +56,7 @@ npm run test:watch   # re-run on file changes
 | `settings.test.js` | Table-driven round-trip test for every setting key (PUT then GET reflects it — this would have caught Issue 007 immediately), plus a dedicated `confirm_bulk_actions` regression test, 400-on-unknown-key, and overwrite-not-duplicate-rows |
 | `oauth-config.test.js` | Asserts the registered passport Google strategy actually requests the `youtube.readonly` scope (plus `profile`/`email`) — a real runtime check against `passport._strategy('google')._scope`, not a source-text guess |
 | `error-logging.test.js` | Forces a real sync failure (mocked 403 from `subscriptions.list`, carrying a genuine Authorization-bearing request) and asserts the access token never leaks into the client response, console output, or `sync_log`/`error_log` rows |
+| `sync-progress.test.js` | The live sync progress counter (`GET /api/subscriptions/sync/progress`): using a delayed multi-page mock, asserts the reported count increases monotonically while a sync is in flight, then clears to `null` once it completes — including when the sync fails partway through |
 
 ## What this doesn't cover (stays manual)
 
@@ -116,6 +117,14 @@ token has a 24h expiry for convenience).
   `.env`, real Neon DB, real Google login) — the two are never running
   against the same database, so there's no risk of this touching real
   user data.
+- **"Sync now" works end to end in this environment too**, via a `nock`
+  mock in `dev-seeded.js` that intercepts the real `subscriptions.list`
+  call (300 fake "Live Sync Channel N" subscriptions, paginated with a
+  realistic ~500ms per-page delay so the live progress counter has
+  something to show). Clicking sync will **replace** the seeded
+  topic-based creators (Tech Daily, etc.) with these — that's expected,
+  it's exercising the real sync/reconciliation path. Run `npm run
+  seed:dev` again afterward to restore the original demo data.
 
 ### Ports — both server setups use the same ones, and can't run at once
 

@@ -12,6 +12,38 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env.test'), overri
 process.env.PORT = '3001';
 process.env.NODE_ENV = 'development';
 
+// Mock the real YouTube subscriptions.list call so "Sync now" works end to
+// end against the fake dev-preview user (see seed-dev-data.js's
+// seedOAuthToken call) without a real Google account or real API quota.
+// Paginated with a realistic per-page delay so the live progress counter
+// (client/src/components/CreatorPanel.jsx) actually has something to show
+// while syncing, instead of resolving instantly. .persist() so repeated
+// "Sync now" clicks keep working, not just the first one.
+const nock = require('nock');
+const LIVE_SYNC_TOTAL = 300;
+const LIVE_SYNC_PAGE_SIZE = 50;
+const LIVE_SYNC_PAGE_DELAY_MS = 500;
+
+for (let offset = 0; offset < LIVE_SYNC_TOTAL; offset += LIVE_SYNC_PAGE_SIZE) {
+  const isLast = offset + LIVE_SYNC_PAGE_SIZE >= LIVE_SYNC_TOTAL;
+  const items = Array.from({ length: LIVE_SYNC_PAGE_SIZE }, (_, i) => {
+    const n = offset + i;
+    return {
+      snippet: {
+        title: `Live Sync Channel ${n}`,
+        resourceId: { channelId: `UC_live_${n}` },
+        thumbnails: { default: { url: `https://example.com/UC_live_${n}.jpg` } },
+      },
+    };
+  });
+  nock('https://www.googleapis.com')
+    .persist()
+    .get('/youtube/v3/subscriptions')
+    .query(q => q.pageToken === (offset === 0 ? undefined : `page_${offset}`))
+    .delay(LIVE_SYNC_PAGE_DELAY_MS)
+    .reply(200, { items, nextPageToken: isLast ? undefined : `page_${offset + LIVE_SYNC_PAGE_SIZE}` });
+}
+
 // index.js only auto-listens when it's the directly-executed entry point
 // (require.main === module) — that's false here since this script requires
 // it as a dependency, so we have to start listening ourselves.

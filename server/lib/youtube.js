@@ -9,6 +9,21 @@ const INACTIVE_TTL_MINUTES = 60;
 
 const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
 
+// In-memory, per-user count of subscriptions fetched so far during an
+// in-progress sync — lets the client poll for live progress without
+// turning the single-request sync flow into a streaming/websocket one.
+// Single-process assumption (matches this app's current Render deploy);
+// would need a shared store if ever run across multiple instances.
+const syncProgressByUser = new Map();
+
+function getSyncProgress(userId) {
+  return syncProgressByUser.has(userId) ? syncProgressByUser.get(userId) : null;
+}
+
+function clearSyncProgress(userId) {
+  syncProgressByUser.delete(userId);
+}
+
 function parseDuration(iso) {
   if (!iso) return null;
   const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
@@ -187,7 +202,7 @@ async function getVideosForChannels(channelIds, isActive = false) {
 
 const SUBSCRIPTION_PAGE_LIMIT = 100; // safety cap: 100 pages × 50 = 5,000 results
 
-async function fetchSubscriptions(accessToken) {
+async function fetchSubscriptions(accessToken, userId) {
   const subs = [];
   let pageToken = null;
   let pageCount = 0;
@@ -211,6 +226,8 @@ async function fetchSubscriptions(accessToken) {
 
     pageToken = res.data.nextPageToken || null;
     pageCount++;
+
+    if (userId != null) syncProgressByUser.set(userId, subs.length);
 
     console.log(`[subs page ${pageCount}] ${(res.data.items || []).length} items | nextPageToken: ${res.data.nextPageToken || 'NONE'}`);
 
@@ -295,4 +312,7 @@ async function fetchComments(videoId) {
   }
 }
 
-module.exports = { getVideosForChannels, fetchSubscriptions, fetchVideoDetails, fetchComments, formatViewCount };
+module.exports = {
+  getVideosForChannels, fetchSubscriptions, fetchVideoDetails, fetchComments, formatViewCount,
+  getSyncProgress, clearSyncProgress,
+};
