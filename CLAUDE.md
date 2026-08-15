@@ -17,7 +17,7 @@ context files — live in a **separate sibling repo**:
 
 Start here in the docs repo when picking work back up:
 - `context-files/2026-07-29-full-build-audit.md` — latest full status audit
-- `decisions/README.md` — the 47-decision unified log (architecture rationale)
+- `decisions/README.md` — the 48-decision unified log (architecture rationale)
 - `testing/known-issues-log.md` — what's actually still broken
 - `decisions/20260620-03-open-items-tracker.md` — the working checklist
 
@@ -48,11 +48,12 @@ docs repo for the full standard.
   actions, uses `createPortal` for confirmation modals (fixes iframe
   stacking-context issue).
 
-`server/tests/` has an automated Vitest + supertest + nock suite (30 tests,
+`server/tests/` has an automated Vitest + supertest + nock suite (40 tests,
 all passing as of 2026-08-02) covering DB connectivity, login (JWT-mint
 bypass, not real OAuth), all 8 timeframe filters, creator-filter
 cross-contamination, subscription sync/pagination (incl. a 2,100-sub
-mocked simulation), and a regression test for the RSS-depth bug below. Run
+mocked simulation), settings persistence (table-driven round-trip for
+every setting key), and a regression test for the RSS-depth bug below. Run
 with `npm test` from `server/`.
 
 `client/tests/` has a separate Vitest + React Testing Library suite
@@ -92,6 +93,17 @@ backstop for the case where neither event fires. Verified live in a
 real browser against the real youtube.com block, not mocked — see
 `testing/known-issues-log.md` Issue 005 and Decision 046 in the docs
 repo.
+
+**"Confirm bulk actions" setting didn't survive a page reload.** Root
+cause: `server/routes/settings.js`'s `ALLOWED_KEYS` allowlist was
+missing `confirm_bulk_actions`, so every save attempt got a silent
+`400 Unknown setting` — `SettingsPage.jsx`'s `saveSetting()` doesn't
+check `res.ok`, so the checkbox's local state flipped instantly while
+the actual DB write silently never happened. Fixed by adding the key to
+the allowlist. Verified with before/after API output, a new 10-test
+suite (`server/tests/settings.test.js`), and a live full-page-reload
+test in a real browser. See `testing/known-issues-log.md` Issue 007 and
+Decision 048.
 
 ## Known open bug (confirmed root cause, not yet fixed)
 

@@ -53,6 +53,7 @@ npm run test:watch   # re-run on file changes
 | `creator-filter.test.js` | Cross-contamination: single/multiple creators, select-all-then-narrow, rapid-toggle race condition, cross-user isolation |
 | `subscription-sync.test.js` | `subscriptions.list` pagination (incl. a 2,100-subscription simulation and the real ~987/1000 ceiling), the 100-page safety cap, sync add/remove reconciliation, and a 2,500-row DB-scale listing check |
 | `rss-depth-regression.test.js` | Reproduces Issue 002 (RSS's 15-video cap silently drops older videos from "last month"+ windows because the API fallback never triggers when RSS succeeds) |
+| `settings.test.js` | Table-driven round-trip test for every setting key (PUT then GET reflects it — this would have caught Issue 007 immediately), plus a dedicated `confirm_bulk_actions` regression test, 400-on-unknown-key, and overwrite-not-duplicate-rows |
 
 ## What this doesn't cover (stays manual)
 
