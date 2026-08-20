@@ -7,8 +7,8 @@ NOT exercised here — see "What this doesn't cover" below.
 
 ## One-time setup
 
-1. Install Postgres locally (already done on Marc's machine via
-   `brew install postgresql@18`; start it with `brew services start postgresql@18`).
+1. Install Postgres locally (e.g. `brew install postgresql@18`; start it
+   with `brew services start postgresql@18`).
 2. Create the test database and load the schema:
    ```
    psql -d postgres -c "CREATE DATABASE noisetosignal_test;"

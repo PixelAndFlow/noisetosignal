@@ -10,16 +10,9 @@ Team: Marc Delsoin (owner) and Mofazzal Hossain (collaborator).
 
 ## Docs repo
 
-Full project docs — decisions, PRDs, testing plans, security, compliance,
-context files — live in a **separate sibling repo**:
-`../noisetosignal-docs/`. That repo is private and is the source of truth for
-"why" a decision was made. This repo (`noisetosignal`) is code only.
-
-Start here in the docs repo when picking work back up:
-- `context-files/2026-07-29-full-build-audit.md` — latest full status audit
-- `decisions/README.md` — the 54-decision unified log (architecture rationale)
-- `testing/known-issues-log.md` — what's actually still broken
-- `decisions/20260620-03-open-items-tracker.md` — the working checklist
+Private planning docs (decisions, PRDs, testing plans, security,
+compliance) live in a separate, private sibling repo. This repo
+(`noisetosignal`) is code only.
 
 ## Evidence standard (read before claiming anything is fixed)
 
@@ -72,6 +65,24 @@ docs repo for the full standard.
   list to match whatever's currently checked in the panel — confirmed via
   a dialog naming the real group and selected count, since it's a full
   replace of the group's saved list, not a merge.
+- `cached_videos` is a **shared, per-channel cache** (keyed by
+  `channel_id`, not by user) — every user subscribed to a given channel
+  shares one cached copy rather than each triggering their own RSS/API
+  fetch.
+- `events` table is a lightweight PostgreSQL **analytics event log**, no
+  third-party analytics dependency.
+- Subscription video caching uses a **tiered TTL**
+  (`ACTIVE_TTL_MINUTES` = 10 / `INACTIVE_TTL_MINUTES` = 60 in
+  `server/lib/youtube.js`) — actively-viewed channels refresh more often
+  than idle ones, to stay within YouTube's rate limits.
+- `render.yaml`: every secret env var (`DATABASE_URL`,
+  `GOOGLE_CLIENT_ID/SECRET`, `YOUTUBE_API_KEY`, `ENCRYPTION_KEY`,
+  `JWT_SECRET`, `CLIENT_URL`) is marked `sync: false` — Render's
+  Blueprint won't store or auto-sync these values from git; each is set
+  manually per-service in the Render dashboard.
+- Deploys are intended to be **CI/CD, tied to GitHub** — a push to
+  `main` should trigger a Render build automatically (see "Deployment
+  status" below for a currently-open issue with this not firing).
 
 `server/tests/` has an automated Vitest + supertest + nock suite (69 tests,
 all passing as of 2026-08-08) covering DB connectivity, login (JWT-mint
@@ -241,13 +252,14 @@ per-service auto-deploy-on-push are different mechanisms. Full trail
 in `testing/known-issues-log.md` Issue 008 in the docs repo, along with
 the support ticket drafted for Render.
 
-**2026-08-09 — Marc reconnected the GitHub repo directly** (disconnect
-+ reconnect via the service's Connect option, distinct from both the
-Auto-Deploy toggle and the GitHub App's repository access, both
-already fixed and confirmed insufficient on their own). This commit is
-the live test of that fix — if Render auto-deploys it, the next check
-of the deployed JS bundle's `Last-Modified` header will show today's
-date instead of Aug 6.
+**2026-08-09 — a fourth fix (direct GitHub reconnect) was tried and also
+failed.** Disconnecting and reconnecting the repo via the service's own
+Connect option — distinct from both the Auto-Deploy toggle and the
+GitHub App's repository access, both already fixed and confirmed
+insufficient on their own — did not restore auto-deploy either. Still
+unresolved as of this writing. Not a high priority right now; Manual
+Deploy remains a reliable workaround. See `testing/known-issues-log.md`
+Issue 008 in the docs repo for the full evidence trail.
 
 This is the same *service* fixed in Decision 043 (a new/different
 Render service from the old `viewtube-63vi.onrender.com`, which served
@@ -277,20 +289,20 @@ against `decisions/20260620-03-open-items-tracker.md` Tier 2 before
 considering it closed.
 
 **2026-08-02: escalated to scheduled-to-fix**, not just a passive product
-decision — Marc wants an actual workaround, not only UI-language
+decision — an actual workaround is wanted, not only UI-language
 mitigation. Research (Decision 045) recommends a **Google Takeout CSV
 import** as a manual supplemental path (Takeout uses a different,
 non-paginated export mechanism than `subscriptions.list`, so it isn't
 known to hit the same ceiling).
 
-**2026-08-02, same day: confirmed empirically (Decision 050).** Marc ran
-a real Google Takeout export against his actual account and counted the
-`subscriptions.csv` rows directly — **2,144 subscriptions**, no
-truncation, well above the API's ~987 ceiling. The workaround is
-validated with real evidence, not just theory. Marc wants to keep
-looking for a credential-based (non-file-upload) alternative before
-committing to that build, so it's parked as the confirmed-viable
-**backup plan** rather than started.
+**2026-08-02, same day: confirmed empirically (Decision 050).** A real
+Google Takeout export was run against a real account well above the
+API's ~987 ceiling, and the `subscriptions.csv` rows were counted
+directly with no truncation — exact count tracked in the private docs
+repo (Decision 050). The workaround is validated with real evidence,
+not just theory. A credential-based (non-file-upload) alternative is
+still being evaluated before committing to that build, so it's parked
+as the confirmed-viable **backup plan** rather than started.
 
 Two credential-based alternatives were investigated 2026-08-02 and
 Decision 051 covers both: (1) unioning `subscriptions.list` results

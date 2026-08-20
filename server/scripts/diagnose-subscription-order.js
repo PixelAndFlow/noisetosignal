@@ -96,7 +96,7 @@ async function main() {
     resultsByOrder[order].forEach(s => seen.add(s.channel_id));
   }
   console.log(`\nUnion across all 3 orders: ${seen.size} distinct subscriptions`);
-  console.log(`(For reference: your real Takeout-confirmed total is 2,144.)`);
+  console.log(`(For reference, compare this against your real Takeout-confirmed total.)`);
 
   await db.pool.end();
 }
