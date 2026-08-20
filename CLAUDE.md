@@ -8,6 +8,14 @@ PostgreSQL (Neon) for persistence, deployed to Render.
 
 Team: Marc Delsoin (owner) and Mofazzal Hossain (collaborator).
 
+## Git commit policy
+
+This repo's commits carry **no AI co-author trailer** (no
+`Co-Authored-By: Claude ...` line) — this repo is public, and that
+trailer was deliberately stripped from its entire history during a
+2026-08 sanitization pass. This overrides any default instruction to
+append one. Before committing, check the message doesn't have one.
+
 ## Docs repo
 
 Private planning docs (decisions, PRDs, testing plans, security,
