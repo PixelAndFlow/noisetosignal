@@ -206,19 +206,29 @@ suite (`server/tests/settings.test.js`), and a live full-page-reload
 test in a real browser. See `testing/known-issues-log.md` Issue 007 and
 Decision 048.
 
-## Known open bug (confirmed root cause, not yet fixed)
+## Recently fixed (2026-08-23)
 
-**Videos older than ~1 week can be missing from the feed.** Timeframe
-filters beyond "last week" (last month / 3 months / 6 months) are unreliable.
+**Videos older than ~1 week could be missing from the feed.** Timeframe
+filters beyond "last week" (last month / 3 months / 6 months) were
+unreliable. Root cause: `getVideosForChannels` in `server/lib/youtube.js`
+always called `fetchRSSVideos` on a cache miss, and YouTube's RSS feed only
+returns each channel's **15 most recent videos**, with no fallback to the
+YouTube Data API for deeper history when the requested timeframe needed
+more than RSS provided.
 
-Root cause, traced 2026-07-29: `getVideosForChannels` in
-`server/lib/youtube.js` always calls `fetchRSSVideos` on a cache miss, and
-YouTube's RSS feed only returns each channel's **15 most recent videos**.
-There is no fallback to the YouTube Data API for deeper history when the
-requested timeframe needs more than RSS provides. Any channel that uploads
-more than ~15 times within the user's selected window will be missing older
-videos from that window. This is `testing/known-issues-log.md` Issue 002 in
-the docs repo — still open as of this writing.
+Fixed by making `getVideosForChannels` cutoff-aware: a channel's cache now
+only counts as fresh if it's unexpired *and* either has fewer than 15
+cached videos (that's the channel's entire history) or its oldest cached
+video already reaches back past the requested cutoff. When RSS hits its cap
+without reaching the cutoff, the API fallback now pages deeper instead of
+fetching a single capped page. Shallow requests still never touch the API,
+so this doesn't add quota cost for the common case. Verified: automated
+regression suite (previously asserted the bug, flipped to assert the fix;
+server suite 71/71), plus a real unmocked run against a real, frequently-
+uploading YouTube channel confirming the exact bug scenario reproduces and
+is fixed. See `testing/known-issues-log.md` Issue 002 (resolved) and
+Decision 056 in the docs repo. **Not yet confirmed live for real users** —
+see "Deployment status" below.
 
 ## Deployment status (checked live, 2026-08-06 — ⚠️ STALE DEPLOY, READ THIS)
 

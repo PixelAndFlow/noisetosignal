@@ -14,7 +14,6 @@ no recommendations you didn't ask for.
 
 ## Known in-progress work
 
-- Fixing a bug where older videos don't always show up in the feed
 - Looking at ways around YouTube's subscription API limits for people
   who follow a large number of channels
 

@@ -7,6 +7,18 @@ const RSS_BASE = 'https://www.youtube.com/feeds/videos.xml?channel_id=';
 const ACTIVE_TTL_MINUTES = 10;
 const INACTIVE_TTL_MINUTES = 60;
 
+// YouTube's RSS feed always caps at each channel's 15 most recent uploads —
+// not configurable, not paginated. A channel that uploads more than ~15
+// times within a requested timeframe needs the API instead (see Issue 002
+// in noisetosignal-docs/testing/known-issues-log.md).
+const RSS_ENTRY_CAP = 15;
+// Safety cap on how many pages of playlistItems (50/page) a single deep
+// fetch will page through, mirroring the pattern already used for
+// subscription pagination (SUBSCRIPTION_PAGE_LIMIT below). 10 pages = up to
+// 500 videos per channel, comfortably more than any real channel uploads
+// within the app's deepest timeframe filter (6 months).
+const API_DEEP_FETCH_PAGE_CAP = 10;
+
 const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
 
 // In-memory, per-user count of subscriptions fetched so far during an
@@ -65,9 +77,15 @@ async function fetchRSSVideos(channelId) {
   }
 }
 
-async function fetchAPIVideos(channelId, uploadsPlaylistId) {
+// Pages through a channel's uploads playlist. When `cutoff` is given, stops
+// once a page's oldest item reaches back past it (the uploads playlist is
+// newest-first, so once we're past the cutoff there's nothing more the
+// caller needs) — otherwise pages until the API itself runs out
+// (`nextPageToken` absent) or the safety cap is hit.
+async function fetchAPIVideos(channelId, uploadsPlaylistId, cutoff = null) {
   const items = [];
   let pageToken = null;
+  let pageCount = 0;
   do {
     const params = {
       part: 'snippet',
@@ -89,7 +107,16 @@ async function fetchAPIVideos(channelId, uploadsPlaylistId) {
       });
     }
     pageToken = res.data.nextPageToken || null;
-  } while (pageToken && items.length < 50);
+    pageCount++;
+
+    const oldestSoFar = items[items.length - 1]?.published_at;
+    if (cutoff && oldestSoFar && new Date(oldestSoFar) <= cutoff) break;
+
+    if (pageCount >= API_DEEP_FETCH_PAGE_CAP) {
+      console.error(`fetchAPIVideos: hit ${API_DEEP_FETCH_PAGE_CAP}-page safety cap for channel ${channelId} (${items.length} videos fetched) without reaching the requested cutoff.`);
+      break;
+    }
+  } while (pageToken);
   return items;
 }
 
@@ -118,22 +145,54 @@ async function enrichWithDurationAndViews(videoIds) {
   return result;
 }
 
-async function getVideosForChannels(channelIds, isActive = false) {
+// A channel's cache is only "fresh" (safe to skip refetching) if it's both
+// unexpired AND deep enough to answer the requested cutoff. Row count alone
+// tells us when a channel's *entire* history is already cached — if RSS (or
+// a prior API fetch) returned fewer than RSS_ENTRY_CAP videos, there is
+// nothing older to find, regardless of how far back `cutoff` reaches. Only
+// once a channel has at least RSS_ENTRY_CAP cached rows does the oldest
+// cached video's date actually need to be compared against the cutoff. This
+// is the fix for Issue 002 ("videos older than ~1 week can be missing from
+// the feed") — the old code treated any unexpired cache as fresh regardless
+// of whether it covered the requested timeframe.
+function channelCoversCutoff(coverageRow, cutoff) {
+  if (!coverageRow) return false;
+  const rowCount = parseInt(coverageRow.row_count, 10);
+  if (rowCount < RSS_ENTRY_CAP) return true;
+  if (!cutoff) return true;
+  return new Date(coverageRow.oldest) <= cutoff;
+}
+
+async function getVideosForChannels(channelIds, isActive = false, cutoff = null) {
   const ttlMinutes = isActive ? ACTIVE_TTL_MINUTES : INACTIVE_TTL_MINUTES;
   const now = new Date();
 
-  // Single query: top-50 unexpired videos for every channel in one round-trip
-  const cachedResult = await db.query(
+  const coverageResult = await db.query(
+    `SELECT channel_id, COUNT(*) AS row_count, MIN(published_at) AS oldest
+     FROM cached_videos
+     WHERE channel_id = ANY($1) AND expires_at > NOW()
+     GROUP BY channel_id`,
+    [channelIds]
+  );
+  const coverageByChannel = new Map(coverageResult.rows.map(r => [r.channel_id, r]));
+
+  const freshChannelIds = channelIds.filter(id => channelCoversCutoff(coverageByChannel.get(id), cutoff));
+  const freshChannelSet = new Set(freshChannelIds);
+  const stale = channelIds.filter(id => !freshChannelSet.has(id));
+
+  // Top-200 unexpired videos per fresh channel — only feeds this function's
+  // own return value (routes/videos.js queries cached_videos directly for
+  // the actual feed response), so this is a generous convenience cap, not
+  // the depth guarantee itself.
+  const freshRows = freshChannelIds.length === 0 ? { rows: [] } : await db.query(
     `SELECT * FROM (
        SELECT *, row_number() OVER (PARTITION BY channel_id ORDER BY published_at DESC) AS rn
        FROM cached_videos
        WHERE channel_id = ANY($1) AND expires_at > NOW()
-     ) ranked WHERE rn <= 50`,
-    [channelIds]
+     ) ranked WHERE rn <= 200`,
+    [freshChannelIds]
   );
-  const freshChannelSet = new Set(cachedResult.rows.map(r => r.channel_id));
-  const fresh = cachedResult.rows.map(({ rn: _, ...row }) => row);
-  const stale = channelIds.filter(id => !freshChannelSet.has(id));
+  const fresh = freshRows.rows.map(({ rn: _, ...row }) => row);
 
   const CHANNEL_BATCH_SIZE = 20;
   for (let i = 0; i < stale.length; i += CHANNEL_BATCH_SIZE) {
@@ -142,17 +201,29 @@ async function getVideosForChannels(channelIds, isActive = false) {
       let videos = await fetchRSSVideos(channelId);
       let source = 'rss';
 
-      if (!videos) {
+      // RSS is capped at RSS_ENTRY_CAP regardless of what's asked for. If it
+      // hit that cap and its oldest entry still doesn't reach back to the
+      // requested cutoff, RSS alone can't answer this request — the API can
+      // page deeper. (If RSS failed outright, videos is null here too, so
+      // the same fallback covers both cases.)
+      const rssHitCapWithoutReachingCutoff = cutoff && Array.isArray(videos) && videos.length >= RSS_ENTRY_CAP
+        && !videos.some(v => v.published_at && new Date(v.published_at) <= cutoff);
+
+      if (videos === null || rssHitCapWithoutReachingCutoff) {
         try {
           const playlistId = await getUploadsPlaylistId(channelId);
           if (playlistId) {
-            videos = await fetchAPIVideos(channelId, playlistId);
+            const apiVideos = await fetchAPIVideos(channelId, playlistId, cutoff);
+            videos = apiVideos;
             source = 'api';
-          } else {
+          } else if (videos === null) {
             videos = [];
           }
+          // else: playlist lookup failed but RSS already gave us its
+          // (shallower) list — keep it rather than discarding real data.
         } catch {
-          videos = [];
+          if (videos === null) videos = [];
+          // else: keep whatever RSS returned — partial depth beats none.
         }
       }
 
@@ -183,7 +254,7 @@ async function getVideosForChannels(channelIds, isActive = false) {
         }
 
         const rows = await db.query(
-          `SELECT * FROM cached_videos WHERE channel_id = $1 AND expires_at > NOW() ORDER BY published_at DESC LIMIT 50`,
+          `SELECT * FROM cached_videos WHERE channel_id = $1 AND expires_at > NOW() ORDER BY published_at DESC LIMIT 200`,
           [channelId]
         );
         fresh.push(...rows.rows);

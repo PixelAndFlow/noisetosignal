@@ -34,7 +34,7 @@ router.get('/feed', requireAuth, async (req, res) => {
   const minutes = RECENCY_MAP[timeframe] || RECENCY_MAP.last_3_days;
   const cutoff = new Date(Date.now() - minutes * 60 * 1000);
 
-  await getVideosForChannels(channelIds, true);
+  await getVideosForChannels(channelIds, true, cutoff);
 
   const watched = await db.query(
     'SELECT video_id FROM watched_videos WHERE user_id = $1',
