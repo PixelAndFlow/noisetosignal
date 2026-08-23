@@ -106,7 +106,7 @@ router.get('/:videoId', requireAuth, async (req, res) => {
   const isSubscribed = subs.rows.length > 0;
 
   const watched = await db.query(
-    'SELECT video_id FROM watched_videos WHERE user_id = $1 AND video_id = $2',
+    'SELECT video_id, progress_seconds FROM watched_videos WHERE user_id = $1 AND video_id = $2',
     [req.user.id, videoId]
   );
 
@@ -116,7 +116,48 @@ router.get('/:videoId', requireAuth, async (req, res) => {
     channel_name: subs.rows[0]?.channel_name || video.channel_name,
     channel_avatar_url: subs.rows[0]?.channel_avatar_url || video.channel_avatar_url,
     watched: watched.rows.length > 0,
+    resume_seconds: watched.rows[0]?.progress_seconds || 0,
   });
+});
+
+// Saved periodically by the player while watching, and cleared (0) once a
+// video is finished — see client/src/pages/WatchPage.jsx. Separate from
+// POST /:videoId/watched (fired once on open, to mark watched at all) since
+// progress updates repeatedly for the life of a viewing session.
+router.put('/:videoId/progress', requireAuth, async (req, res) => {
+  const { videoId } = req.params;
+  const progressSeconds = parseInt(req.body.progress_seconds, 10);
+
+  if (!Number.isFinite(progressSeconds) || progressSeconds < 0) {
+    return res.status(400).json({ error: 'progress_seconds must be a non-negative number' });
+  }
+
+  // This route is called repeatedly while a video plays, almost always
+  // updating a row POST /:videoId/watched already created — the per-user
+  // cap only needs to apply when this call would actually insert a *new*
+  // row (e.g. it somehow raced ahead of the watched-marking call), not on
+  // every periodic progress update.
+  const existing = await db.query(
+    'SELECT 1 FROM watched_videos WHERE user_id = $1 AND video_id = $2',
+    [req.user.id, videoId]
+  );
+  if (existing.rows.length === 0) {
+    const count = await db.query('SELECT COUNT(*) FROM watched_videos WHERE user_id = $1', [req.user.id]);
+    if (parseInt(count.rows[0].count) >= 500) {
+      await db.query(
+        'DELETE FROM watched_videos WHERE id = (SELECT id FROM watched_videos WHERE user_id = $1 ORDER BY watched_at ASC LIMIT 1)',
+        [req.user.id]
+      );
+    }
+  }
+
+  await db.query(
+    `INSERT INTO watched_videos (user_id, video_id, watched_at, progress_seconds)
+     VALUES ($1, $2, NOW(), $3)
+     ON CONFLICT (user_id, video_id) DO UPDATE SET progress_seconds = EXCLUDED.progress_seconds`,
+    [req.user.id, videoId, progressSeconds]
+  );
+  res.json({ ok: true });
 });
 
 router.post('/:videoId/watched', requireAuth, async (req, res) => {

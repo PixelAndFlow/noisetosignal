@@ -1,7 +1,27 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import KeyboardShortcutsOverlay from '../components/KeyboardShortcutsOverlay';
+import { loadYouTubeIframeAPI } from '../lib/youtubeIframeApi';
 import './WatchPage.css';
+
+// How often to persist playback position while a video is playing.
+const PROGRESS_SAVE_INTERVAL_MS = 8000;
+// Don't bother saving a resume point in the first few seconds — resuming
+// "5 seconds in" isn't meaningfully different from starting over.
+const MIN_RESUMABLE_SECONDS = 5;
+// Once this close to the end, treat the video as finished rather than
+// saving a resume point nobody would want (resuming at 99% just to rewatch
+// the last few seconds).
+const NEAR_END_FRACTION = 0.95;
+
+function saveProgress(videoId, seconds) {
+  fetch(`/api/videos/${videoId}/progress`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ progress_seconds: Math.max(0, Math.floor(seconds)) }),
+  }).catch(() => {});
+}
 
 export default function WatchPage() {
   const { videoId } = useParams();
@@ -12,7 +32,10 @@ export default function WatchPage() {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
-  const playerRef = useRef(null);
+  const playerContainerRef = useRef(null);
+  const playerRef = useRef(null); // holds the real YT.Player instance once ready
+  const resumeSecondsRef = useRef(0);
+  const saveIntervalRef = useRef(null);
 
   useEffect(() => {
     setLoading(true);
@@ -22,34 +45,124 @@ export default function WatchPage() {
         setVideo(data);
         setLoading(false);
         if (data) {
+          resumeSecondsRef.current = data.resume_seconds || 0;
           fetch(`/api/videos/${videoId}/watched`, { method: 'POST', credentials: 'include' }).catch(() => {});
         }
       })
       .catch(() => setLoading(false));
   }, [videoId]);
 
+  // Creates the real YT.Player once both the video's metadata (for the
+  // resume position) and the IFrame API script are ready. Rebuilds when
+  // videoId changes (navigating to a different video's watch page).
+  useEffect(() => {
+    if (!video || !playerContainerRef.current) return;
+    let cancelled = false;
+
+    // The YT IFrame API replaces whatever element it's given with its own
+    // <iframe>, which React must never be the one rendering directly (it
+    // would fight React for ownership of that DOM node). Instead give it an
+    // imperatively-created placeholder inside a wrapper div that JSX renders
+    // empty and never touches again.
+    const placeholder = document.createElement('div');
+    playerContainerRef.current.appendChild(placeholder);
+
+    loadYouTubeIframeAPI().then((YT) => {
+      if (cancelled) return;
+      playerRef.current = new YT.Player(placeholder, {
+        videoId,
+        playerVars: { autoplay: 1, enablejsapi: 1 },
+        events: {
+          onReady: (e) => {
+            const resume = resumeSecondsRef.current;
+            if (resume > MIN_RESUMABLE_SECONDS) {
+              e.target.seekTo(resume, true);
+            }
+          },
+          onStateChange: (e) => {
+            const YTState = window.YT.PlayerState;
+            clearInterval(saveIntervalRef.current);
+
+            if (e.data === YTState.PLAYING) {
+              saveIntervalRef.current = setInterval(() => {
+                const p = playerRef.current;
+                if (!p) return;
+                const current = p.getCurrentTime();
+                const duration = p.getDuration();
+                const nearEnd = duration > 0 && current >= duration * NEAR_END_FRACTION;
+                saveProgress(videoId, nearEnd ? 0 : current);
+              }, PROGRESS_SAVE_INTERVAL_MS);
+            } else if (e.data === YTState.PAUSED) {
+              const current = e.target.getCurrentTime();
+              const duration = e.target.getDuration();
+              const nearEnd = duration > 0 && current >= duration * NEAR_END_FRACTION;
+              saveProgress(videoId, nearEnd ? 0 : current);
+            } else if (e.data === YTState.ENDED) {
+              saveProgress(videoId, 0);
+            }
+          },
+        },
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      clearInterval(saveIntervalRef.current);
+      // Best-effort save of wherever playback was when leaving the page —
+      // not guaranteed to complete (a plain fetch during unmount can be cut
+      // off), but better than losing progress made since the last interval
+      // tick.
+      const p = playerRef.current;
+      if (p && typeof p.getCurrentTime === 'function') {
+        try {
+          const current = p.getCurrentTime();
+          const duration = p.getDuration();
+          const nearEnd = duration > 0 && current >= duration * NEAR_END_FRACTION;
+          saveProgress(videoId, nearEnd ? 0 : current);
+        } catch { /* player may already be torn down */ }
+      }
+      if (p && typeof p.destroy === 'function') {
+        p.destroy(); // removes the iframe it created
+      } else if (placeholder.isConnected) {
+        // Never got as far as creating the player (e.g. unmounted while
+        // loadYouTubeIframeAPI() was still pending) — remove the
+        // placeholder ourselves so it doesn't leak across remounts.
+        placeholder.remove();
+      }
+      playerRef.current = null;
+    };
+  }, [video, videoId]);
+
   const handleKeyboard = useCallback((e) => {
-    if (!playerRef.current) return;
-    const player = playerRef.current.contentWindow;
+    const player = playerRef.current;
     if (e.key === '?' || e.key === '/') {
       e.preventDefault();
       setShowShortcuts(v => !v);
       return;
     }
-    const postMsg = (cmd) => player.postMessage(JSON.stringify({ event: 'command', func: cmd, args: [] }), '*');
+    if (!player || typeof player.getPlayerState !== 'function') return;
+
     if (e.key === ' ' || e.key === 'k' || e.key === 'K') {
       e.preventDefault();
-      postMsg('togglePlay');
+      const YTState = window.YT.PlayerState;
+      if (player.getPlayerState() === YTState.PLAYING) player.pauseVideo();
+      else player.playVideo();
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      player.postMessage(JSON.stringify({ event: 'command', func: 'seekBy', args: [-10] }), '*');
+      player.seekTo(Math.max(0, player.getCurrentTime() - 10), true);
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
-      player.postMessage(JSON.stringify({ event: 'command', func: 'seekBy', args: [10] }), '*');
+      player.seekTo(player.getCurrentTime() + 10, true);
     } else if (e.key === 'm' || e.key === 'M') {
-      postMsg('toggleMute');
+      if (player.isMuted()) player.unMute();
+      else player.mute();
     } else if (e.key === 'f' || e.key === 'F') {
-      postMsg('toggleFullscreen');
+      // Target the player's actual live iframe (via the API, not our own
+      // ref) — the wrapper div we render is an empty, YT-managed
+      // placeholder holder, not the element that should go fullscreen.
+      const iframe = typeof player.getIframe === 'function' ? player.getIframe() : null;
+      if (document.fullscreenElement) document.exitFullscreen?.();
+      else iframe?.requestFullscreen?.();
     }
   }, []);
 
@@ -90,16 +203,9 @@ export default function WatchPage() {
 
       <div className="watch-layout">
         <div className="watch-main">
-          <div className="player-wrap">
-            <iframe
-              ref={playerRef}
-              src={`https://www.youtube.com/embed/${videoId}?enablejsapi=1&autoplay=1`}
-              title={video.title}
-              className="player-iframe"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-              allowFullScreen
-            />
-          </div>
+          {/* Left empty on purpose — the YT IFrame API owns everything
+              inside this wrapper once the player effect runs. */}
+          <div className="player-wrap" ref={playerContainerRef} />
 
           <div className="watch-info">
             <h1 className="watch-title">{video.title}</h1>

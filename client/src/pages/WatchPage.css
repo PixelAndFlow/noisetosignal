@@ -18,7 +18,9 @@
   border-radius: var(--radius);
   overflow: hidden;
 }
-.player-iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; }
+/* Targets the iframe the YT IFrame API generates inside .player-wrap, not
+   an iframe authored directly in JSX (see WatchPage.jsx). */
+.player-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; }
 
 .watch-info { padding: 16px 0; }
 
