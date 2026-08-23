@@ -281,8 +281,14 @@ export default function HomePage() {
       <div className="youtube-mode">
         {iframeBlocked ? (
           <div className="iframe-blocked">
-            <p>YouTube can't be embedded here.</p>
-            <a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+            <p className="iframe-blocked-title">YouTube mode runs side by side, not embedded</p>
+            <p className="iframe-blocked-explanation">
+              YouTube doesn't allow its own site to be shown inside another page —
+              that's a restriction YouTube applies to itself, not something broken
+              here. Use the button below to open real YouTube in a new tab and
+              compare it against Signal mode.
+            </p>
+            <a href="https://www.youtube.com" target="_blank" rel="noopener noreferrer" className="open-youtube-btn">
               Open YouTube
             </a>
           </div>
