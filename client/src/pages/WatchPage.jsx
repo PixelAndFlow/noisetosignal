@@ -28,6 +28,8 @@ export default function WatchPage() {
   const [video, setVideo] = useState(null);
   const [comments, setComments] = useState(null);
   const [commentsLoading, setCommentsLoading] = useState(false);
+  const [expandedReplies, setExpandedReplies] = useState(() => new Set());
+  const [loadingReplies, setLoadingReplies] = useState(() => new Set());
   const [descExpanded, setDescExpanded] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -182,6 +184,42 @@ export default function WatchPage() {
     setCommentsLoading(false);
   }
 
+  // commentThreads.list embeds a free preview of a comment's first ~5
+  // replies (see server/lib/youtube.js); toggling open a thread only hits
+  // the network if reply_count says there are more than that preview holds
+  // and they haven't already been fetched (replies_expanded).
+  async function toggleReplies(comment) {
+    if (expandedReplies.has(comment.id)) {
+      setExpandedReplies(prev => {
+        const next = new Set(prev);
+        next.delete(comment.id);
+        return next;
+      });
+      return;
+    }
+    setExpandedReplies(prev => new Set(prev).add(comment.id));
+
+    const needsFullFetch = !comment.replies_expanded && comment.reply_count > (comment.replies?.length || 0);
+    if (!needsFullFetch) return;
+
+    setLoadingReplies(prev => new Set(prev).add(comment.id));
+    try {
+      const res = await fetch(`/api/comments/${videoId}/${comment.id}/replies`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setComments(prev => prev.map(c => (
+          c.id === comment.id ? { ...c, replies: data.replies, replies_expanded: true } : c
+        )));
+      }
+    } finally {
+      setLoadingReplies(prev => {
+        const next = new Set(prev);
+        next.delete(comment.id);
+        return next;
+      });
+    }
+  }
+
   function handleShare() {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
     if (navigator.share) {
@@ -292,6 +330,33 @@ export default function WatchPage() {
                         <div className="comment-meta">
                           {c.like_count > 0 && <span>👍 {c.like_count}</span>}
                         </div>
+                        {c.reply_count > 0 && (
+                          <button className="comment-replies-toggle" onClick={() => toggleReplies(c)}>
+                            {expandedReplies.has(c.id)
+                              ? '▲ Hide replies'
+                              : `▼ ${c.reply_count} ${c.reply_count === 1 ? 'reply' : 'replies'}`}
+                          </button>
+                        )}
+                        {expandedReplies.has(c.id) && (
+                          <div className="comment-replies">
+                            {loadingReplies.has(c.id) ? (
+                              <span className="spinner small" />
+                            ) : (
+                              (c.replies || []).map(r => (
+                                <div key={r.id} className="comment reply">
+                                  <img src={r.author_avatar} alt={r.author} className="comment-avatar small" />
+                                  <div className="comment-body">
+                                    <div className="comment-author">{r.author}</div>
+                                    <div className="comment-text" dangerouslySetInnerHTML={{ __html: r.text }} />
+                                    <div className="comment-meta">
+                                      {r.like_count > 0 && <span>👍 {r.like_count}</span>}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

@@ -347,6 +347,67 @@ async function fetchVideoDetails(videoId) {
   };
 }
 
+function mapReply(item) {
+  return {
+    id: item.id,
+    author: item.snippet.authorDisplayName,
+    author_avatar: item.snippet.authorProfileImageUrl,
+    text: item.snippet.textDisplay,
+    like_count: item.snippet.likeCount,
+    published_at: item.snippet.publishedAt,
+  };
+}
+
+const REPLY_PAGE_LIMIT = 5; // safety cap: 5 pages x 100 = up to 500 replies/thread
+
+// Full reply list for one comment thread, paginated — commentThreads.list
+// only ever embeds a preview (its first ~5 replies), used by fetchComments
+// below; this is the "view all N replies" path, called on demand via
+// expandCommentReplies rather than for every comment on every video load.
+async function fetchAllReplies(commentId) {
+  const replies = [];
+  let pageToken = null;
+  let pageCount = 0;
+  do {
+    const params = { part: 'snippet', parentId: commentId, maxResults: 100, key: process.env.YOUTUBE_API_KEY };
+    if (pageToken) params.pageToken = pageToken;
+    const res = await axios.get(`${YT_API}/comments`, { params });
+    replies.push(...(res.data.items || []).map(mapReply));
+    pageToken = res.data.nextPageToken || null;
+    pageCount++;
+  } while (pageToken && pageCount < REPLY_PAGE_LIMIT);
+  return replies;
+}
+
+// Fetches the full reply list for one comment and patches it into that
+// video's already-cached comment blob (same shared, per-video cache
+// fetchComments already maintains — Decision 038), rather than a separate
+// cache keyed by comment id. Once one user expands a thread, every other
+// user loading the same video's comments gets the full list for free until
+// the cache expires, same sharing behavior as top-level comments already
+// have.
+async function expandCommentReplies(videoId, commentId) {
+  const cached = await db.query(
+    `SELECT comments_json, expires_at FROM cached_comments WHERE video_id = $1`,
+    [videoId]
+  );
+  if (cached.rows.length === 0) return null;
+
+  const comments = cached.rows[0].comments_json;
+  const target = comments.find(c => c.id === commentId);
+  if (!target) return null;
+
+  const replies = await fetchAllReplies(commentId);
+  target.replies = replies;
+  target.replies_expanded = true;
+
+  await db.query(
+    `UPDATE cached_comments SET comments_json = $1 WHERE video_id = $2`,
+    [JSON.stringify(comments), videoId]
+  );
+  return replies;
+}
+
 async function fetchComments(videoId) {
   const cached = await db.query(
     `SELECT comments_json FROM cached_comments WHERE video_id = $1 AND expires_at > NOW()`,
@@ -356,7 +417,7 @@ async function fetchComments(videoId) {
 
   try {
     const res = await axios.get(`${YT_API}/commentThreads`, {
-      params: { part: 'snippet', videoId, maxResults: 20, order: 'relevance', key: process.env.YOUTUBE_API_KEY },
+      params: { part: 'snippet,replies', videoId, maxResults: 20, order: 'relevance', key: process.env.YOUTUBE_API_KEY },
     });
     const comments = (res.data.items || []).map(item => ({
       id: item.id,
@@ -365,6 +426,12 @@ async function fetchComments(videoId) {
       text: item.snippet.topLevelComment.snippet.textDisplay,
       like_count: item.snippet.topLevelComment.snippet.likeCount,
       published_at: item.snippet.topLevelComment.snippet.publishedAt,
+      // commentThreads.list embeds up to ~5 replies for free (no extra
+      // quota) — good enough as a preview; totalReplyCount tells the client
+      // whether there are more to fetch via expandCommentReplies.
+      reply_count: item.snippet.totalReplyCount || 0,
+      replies: (item.replies?.comments || []).map(mapReply),
+      replies_expanded: false,
     }));
 
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
@@ -384,6 +451,6 @@ async function fetchComments(videoId) {
 }
 
 module.exports = {
-  getVideosForChannels, fetchSubscriptions, fetchVideoDetails, fetchComments, formatViewCount,
+  getVideosForChannels, fetchSubscriptions, fetchVideoDetails, fetchComments, expandCommentReplies, formatViewCount,
   getSyncProgress, clearSyncProgress,
 };

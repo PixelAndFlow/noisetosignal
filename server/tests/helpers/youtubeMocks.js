@@ -81,10 +81,70 @@ function mockPlaylistItems(playlistId, videos) {
     });
 }
 
+// comments: [{ id, author, avatarUrl, text, likeCount, publishedAt, replyPreview: [{...}] }]
+// replyPreview mirrors what commentThreads.list embeds for free (up to ~5
+// replies) — separate from the full reply list fetched on demand via
+// mockCommentReplies below.
+function mockCommentThreads(videoId, comments) {
+  return nock('https://www.googleapis.com')
+    .get('/youtube/v3/commentThreads')
+    .query(true)
+    .reply(200, {
+      items: comments.map(c => ({
+        id: c.id,
+        snippet: {
+          totalReplyCount: c.totalReplyCount ?? (c.replyPreview?.length || 0),
+          topLevelComment: {
+            snippet: {
+              authorDisplayName: c.author,
+              authorProfileImageUrl: c.avatarUrl || `https://example.com/${c.author}.jpg`,
+              textDisplay: c.text,
+              likeCount: c.likeCount ?? 0,
+              publishedAt: c.publishedAt,
+            },
+          },
+        },
+        replies: c.replyPreview ? { comments: c.replyPreview.map(replySnippet) } : undefined,
+      })),
+    });
+}
+
+function replySnippet(r) {
+  return {
+    id: r.id,
+    snippet: {
+      authorDisplayName: r.author,
+      authorProfileImageUrl: r.avatarUrl || `https://example.com/${r.author}.jpg`,
+      textDisplay: r.text,
+      likeCount: r.likeCount ?? 0,
+      publishedAt: r.publishedAt,
+    },
+  };
+}
+
+// Mocks GET /comments?parentId=commentId — the full-reply-list fetch used by
+// expandCommentReplies, distinct from commentThreads.list's free preview.
+function mockCommentReplies(commentId, replies) {
+  return nock('https://www.googleapis.com')
+    .get('/youtube/v3/comments')
+    .query(q => q.parentId === commentId)
+    .reply(200, { items: replies.map(replySnippet), nextPageToken: null });
+}
+
+function mockCommentsDisabled(videoId) {
+  return nock('https://www.googleapis.com')
+    .get('/youtube/v3/commentThreads')
+    .query(true)
+    .reply(403, { error: { errors: [{ reason: 'commentsDisabled' }] } });
+}
+
 module.exports = {
   mockRSSFeed,
   mockRSSFeedFailure,
   mockSubscriptionsPages,
   mockUploadsPlaylist,
   mockPlaylistItems,
+  mockCommentThreads,
+  mockCommentReplies,
+  mockCommentsDisabled,
 };
