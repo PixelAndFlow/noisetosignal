@@ -12,6 +12,7 @@ const commentsRouter = require('./routes/comments');
 const settingsRouter = require('./routes/settings');
 const eventsRouter = require('./routes/events');
 const creatorGroupsRouter = require('./routes/creatorGroups');
+const accountRouter = require('./routes/account');
 const { requireAuth } = require('./middleware/auth');
 const db = require('./lib/db');
 
@@ -35,6 +36,7 @@ app.use('/api/videos', videosRouter);
 app.use('/api/comments', commentsRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/events', eventsRouter);
+app.use('/api/account', accountRouter);
 
 // Quota circuit breaker check
 app.use('/api', async (req, res, next) => {

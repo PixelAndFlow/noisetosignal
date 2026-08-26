@@ -95,6 +95,7 @@
 }
 
 .sync-msg { font-size: 13px; color: var(--text-secondary); padding: 6px 0; }
+.export-error { color: var(--danger); }
 
 .danger-zone h2 { color: var(--danger); }
 .confirm-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); }

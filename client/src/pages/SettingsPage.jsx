@@ -45,6 +45,32 @@ export default function SettingsPage() {
   const [syncMsg, setSyncMsg] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(false);
+
+  async function handleExport() {
+    setExporting(true);
+    setExportError(false);
+    try {
+      const res = await fetch('/api/account/export', { credentials: 'include' });
+      if (!res.ok) throw new Error('export failed');
+      const blob = await res.blob();
+      const disposition = res.headers.get('Content-Disposition') || '';
+      const filename = disposition.match(/filename="([^"]+)"/)?.[1] || 'noisetosignal-export.json';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportError(true);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   async function saveSetting(key, value) {
     await fetch(`/api/settings/${key}`, {
@@ -226,6 +252,21 @@ export default function SettingsPage() {
             ))}
           </div>
         </div>
+      </section>
+
+      <section className="settings-section">
+        <h2>Your data</h2>
+
+        <div className="setting-row">
+          <div className="setting-label">
+            <span>Export your data</span>
+            <span className="setting-desc">Download everything NoiseToSignal has stored for your account as a JSON file</span>
+          </div>
+          <button className="btn btn-secondary" onClick={handleExport} disabled={exporting}>
+            {exporting ? <span className="spinner small" /> : 'Export data'}
+          </button>
+        </div>
+        {exportError && <p className="sync-msg export-error">Couldn't export your data. Try again.</p>}
       </section>
 
       <section className="settings-section danger-zone">
