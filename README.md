@@ -1,6 +1,7 @@
 # noisetosignal
 
 [![Tests](https://github.com/PixelAndFlow/noisetosignal/actions/workflows/test.yml/badge.svg)](https://github.com/PixelAndFlow/noisetosignal/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 **Cycle 1: NoiseToSignal**
 Team Members: Marc Delsoin and Mofazzal Hossain
