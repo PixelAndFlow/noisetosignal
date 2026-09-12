@@ -25,6 +25,20 @@ NoiseToSignal is live. It imports real YouTube subscriptions, lets you filter by
 
 This cycle wasn't just about shipping a feature — it was a disciplined approach to the entire software development lifecycle: requirements, architecture decisions, deployment, real-world data testing, and honest documentation of what worked and what didn't.
 
+## Screenshots
+
+**Signal mode** — the creator + timeframe filtered feed, no algorithm:
+
+![Signal mode: a filtered video feed with a creator selection panel on the left](docs/screenshots/signal-mode.jpg)
+
+**Creator panel**, filtered to the "Selected" view:
+
+![Creator panel showing the list of selected creators with checkmarks](docs/screenshots/creator-panel.jpg)
+
+**YouTube mode** — YouTube blocks its own site from being embedded elsewhere, so this mode explains that and opens real YouTube in a new tab for side-by-side comparison instead of failing silently:
+
+![YouTube mode's explained fallback screen with an "Open YouTube" button](docs/screenshots/youtube-mode.jpg)
+
 ## Installation
 
 ### Prerequisites
@@ -109,3 +123,13 @@ Starting the second while the first is still up fails with `EADDRINUSE`.
 ## Roadmap
 
 See [ROADMAP.md](./ROADMAP.md) for what's shipped, in progress, and planned.
+
+## Architecture
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for the system layout, the two
+viewing modes, database schema, API routes, and the key technical
+decisions behind them.
+
+## Security
+
+See [SECURITY.md](./SECURITY.md) for how to report a vulnerability.
