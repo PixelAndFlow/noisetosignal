@@ -1,0 +1,73 @@
+name: Tests
+
+# Runs both automated test suites on every push and PR to main. Neither
+# suite talks to real Google/YouTube services or real credentials — the
+# server suite mocks all outbound network calls (see server/tests/README.md)
+# and runs against a disposable Postgres instance, not Neon; the client
+# suite is pure component rendering in jsdom plus a real (but throwaway)
+# `vite build`. See client/tests/build.test.js.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  server-tests:
+    runs-on: ubuntu-latest
+
+    # Matches server/.env.test's DATABASE_URL exactly (user "techno", no
+    # password, sslmode=disable) so the checked-in test config works
+    # unmodified in CI — see the "Set up test database" step below, which
+    # creates that same role.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Set up test database
+        working-directory: server
+        run: |
+          psql -h localhost -U postgres -c "CREATE ROLE techno SUPERUSER LOGIN;"
+          psql -h localhost -U postgres -c "CREATE DATABASE noisetosignal_test OWNER techno;"
+          psql -h localhost -U techno -d noisetosignal_test -f db/schema.sql
+
+      - name: Run server tests
+        working-directory: server
+        run: npm test
+
+  client-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Run client tests
+        working-directory: client
+        run: npm test
