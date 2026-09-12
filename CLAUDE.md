@@ -118,9 +118,13 @@ components (`VideoCard`, `NavBar`, `Sidebar`) are not covered yet.
 
 See `server/tests/README.md` and `client/tests/README.md` for what's
 intentionally still manual (real OAuth login, real-account subscription
-counts, real-browser behavior like the YouTube iframe). Still no CI —
-neither suite is wired into any pipeline yet, and Render auto-deploys on
-push to `main` with no gate.
+counts, real-browser behavior like the YouTube iframe). **CI added
+2026-09-11** — `.github/workflows/test.yml` runs both suites on every
+push/PR to `main` (server against a disposable Postgres service
+container, client's own suite includes a real throwaway `vite build`).
+Render still auto-deploys on push to `main` with no gate — CI is a
+test check, not a deploy gate; see "Deployment status" below for the
+still-open Render auto-deploy question.
 
 There are two ways to run the server locally — `npm run dev` (real
 `.env`, real Neon DB, real Google login) and `npm run dev:seeded` (real

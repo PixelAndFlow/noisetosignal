@@ -1,5 +1,7 @@
 # noisetosignal
 
+[![Tests](https://github.com/PixelAndFlow/noisetosignal/actions/workflows/test.yml/badge.svg)](https://github.com/PixelAndFlow/noisetosignal/actions/workflows/test.yml)
+
 **Cycle 1: NoiseToSignal**
 Team Members: Marc Delsoin and Mofazzal Hossain
 
